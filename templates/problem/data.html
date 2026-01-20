@@ -557,6 +557,15 @@
                         {{ _('Enable if student code references classes/functions only defined in the harness (e.g., hidden APIs).') }}
                     </p>
                 </div>
+                <div style="margin-bottom: 1em;">
+                    <label>
+                        {{ form.run_student_main }}
+                        {{ _('Run student main') }}
+                    </label>
+                    <p class="help-block" style="margin: 0.25em 0 0 0; font-size: 0.9em; color: #666;">
+                        {{ _('If enabled, student code is the entry point; harness provides hidden APIs.') }}
+                    </p>
+                </div>
                 <div>
                     <label>{{ _('Harness Code') }}</label>
                     {{ form.harness_code }}
