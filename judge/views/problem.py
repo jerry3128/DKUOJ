@@ -40,6 +40,7 @@ from judge.models import (
     Problem,
     ProblemData,
     ProblemGroup,
+    ProblemHarness,
     ProblemPointsVote,
     ProblemTemplate,
     ProblemTestCase,
@@ -1002,6 +1003,7 @@ class ProblemClone(ProblemMixin, PermissionRequiredMixin, TitleMixin, SingleObje
         old_problem_id = problem.id
         test_cases = list(ProblemTestCase.objects.filter(dataset_id=old_problem_id).order_by('order'))
         templates = list(ProblemTemplate.objects.filter(problem_id=old_problem_id))
+        harnesses = list(ProblemHarness.objects.filter(problem_id=old_problem_id))
 
         # Check if ProblemData exists for original problem
         try:
@@ -1036,6 +1038,9 @@ class ProblemClone(ProblemMixin, PermissionRequiredMixin, TitleMixin, SingleObje
 
             # Clone ProblemTemplate instances
             self._clone_templates(templates, problem)
+
+            # Clone ProblemHarness instances
+            self._clone_harnesses(harnesses, problem)
 
             # Copy init.yml from original problem
             self._copy_init_yml(old_code, new_code)
@@ -1202,6 +1207,31 @@ class ProblemClone(ProblemMixin, PermissionRequiredMixin, TitleMixin, SingleObje
         # Bulk create for efficiency
         if new_templates:
             ProblemTemplate.objects.bulk_create(new_templates)
+
+    def _clone_harnesses(self, harnesses, new_problem):
+        """
+        Clone all ProblemHarness instances for the new problem.
+
+        Args:
+            harnesses: List of original ProblemHarness instances
+            new_problem: Newly created Problem instance
+        """
+        new_harnesses = []
+
+        for original in harnesses:
+            new_harness = ProblemHarness()
+            new_harness.problem = new_problem
+            new_harness.language = original.language
+            new_harness.harness_code = original.harness_code
+            new_harness.entry_point = original.entry_point
+            new_harness.skip_precompile = original.skip_precompile
+            new_harness.run_student_main = original.run_student_main
+
+            new_harnesses.append(new_harness)
+
+        # Bulk create for efficiency
+        if new_harnesses:
+            ProblemHarness.objects.bulk_create(new_harnesses)
 
     def _copy_init_yml(self, old_code, new_code):
         """

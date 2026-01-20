@@ -116,7 +116,7 @@ class ProblemHarnessForm(ModelForm):
 
     class Meta:
         model = ProblemHarness
-        fields = ['language', 'entry_point', 'skip_precompile', 'harness_code']
+        fields = ['language', 'entry_point', 'skip_precompile', 'run_student_main', 'harness_code']
         widgets = {
             'harness_code': AceWidget(mode='java', theme='chrome', width='100%', height='300px'),
         }

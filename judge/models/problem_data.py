@@ -113,6 +113,8 @@ class ProblemHarness(models.Model):
     skip_precompile = models.BooleanField(default=False, verbose_name=_('skip pre-compilation'),
         help_text=_('Enable if student code references classes/functions defined in the harness. '
                     'The harness grader will handle compilation instead.'))
+    run_student_main = models.BooleanField(default=False, verbose_name=_('run student main'),
+        help_text=_('If enabled, student code is the entry point; harness provides hidden APIs.'))
 
     class Meta:
         unique_together = ('problem', 'language')
