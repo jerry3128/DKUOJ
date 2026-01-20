@@ -892,7 +892,7 @@ class ProblemSubmit(LoginRequiredMixin, ProblemMixin, TitleMixin, SingleObjectFo
             language_key = form.cleaned_data['language'].key
             if language_key not in harness_languages:
                 harness_language_names = list(
-                    self.object.harnesses.select_related('language').values_list('language__name', flat=True)
+                    self.object.harnesses.select_related('language').values_list('language__name', flat=True),
                 )
                 return generic_message(
                     self.request,

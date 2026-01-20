@@ -17,7 +17,8 @@ per-file-ignores =
     # F405: name comes from import *
     ./judge/management/commands/runmoss.py:F403,F405
     # E501: line too long, ignore in migrations
-    ./judge/migrations/*.py:E501
+    # I100: Import wrong order
+    ./judge/migrations/*.py:E501,I100
     # E265 block comment should start with '# '
     # E117 over-indented (comment)
     ./judge/views/contests.py:E265,E117

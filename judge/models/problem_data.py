@@ -6,7 +6,8 @@ from django.utils.translation import gettext_lazy as _
 
 from judge.utils.problem_data import ProblemDataStorage
 
-__all__ = ['problem_data_storage', 'problem_directory_file', 'ProblemData', 'ProblemTestCase', 'ProblemHarness', 'CHECKERS']
+__all__ = ['problem_data_storage', 'problem_directory_file', 'ProblemData',
+           'ProblemTestCase', 'ProblemHarness', 'CHECKERS']
 
 problem_data_storage = ProblemDataStorage()
 
@@ -107,11 +108,13 @@ class ProblemHarness(models.Model):
                                 related_name='harnesses', on_delete=models.CASCADE)
     language = models.ForeignKey('Language', verbose_name=_('language'), on_delete=models.CASCADE)
     harness_code = models.TextField(verbose_name=_('harness code'),
-        help_text=_('Hidden test code compiled/run with the student submission.'))
-    skip_precompile = models.BooleanField(default=False, verbose_name=_('skip pre-compilation'),
+                                    help_text=_('Hidden test code compiled/run with the student submission.'))
+    skip_precompile = models.BooleanField(
+        default=False, verbose_name=_('skip pre-compilation'),
         help_text=_('Enable if student code references classes/functions defined in the harness. '
                     'The harness grader will handle compilation instead.'))
-    run_student_main = models.BooleanField(default=False, verbose_name=_('run student main'),
+    run_student_main = models.BooleanField(
+        default=False, verbose_name=_('run student main'),
         help_text=_('If enabled, student code is the entry point; harness provides hidden APIs.'))
 
     class Meta:

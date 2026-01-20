@@ -9,7 +9,7 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
-from django.forms import BaseModelFormSet, HiddenInput, ModelForm, NumberInput, Select, Textarea, formset_factory
+from django.forms import BaseModelFormSet, HiddenInput, ModelForm, NumberInput, Select, formset_factory
 from django.forms.models import inlineformset_factory
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
@@ -19,9 +19,8 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
 from django.views.generic import DetailView
 
-from judge.highlight_code import highlight_code
 from django_ace import AceWidget
-
+from judge.highlight_code import highlight_code
 from judge.models import Problem, ProblemData, ProblemHarness, ProblemTestCase, Submission, problem_data_storage
 from judge.utils.problem_data import ProblemDataCompiler
 from judge.utils.unicode import utf8text
@@ -111,7 +110,7 @@ class ProblemHarnessForm(ModelForm):
         # Filter to only Java and Python language variants
         from judge.models import Language
         self.fields['language'].queryset = Language.objects.filter(
-            common_name__in=['Java', 'Python']
+            common_name__in=['Java', 'Python'],
         ).order_by('common_name', 'key')
 
     class Meta:
