@@ -270,30 +270,43 @@
                     $form.css('opacity', '1');
                 }
             });
-        });
 
-        // Handle entry point visibility based on language selection for harness form
-        function updateEntryPointVisibility($form) {
-            var $langSelect = $form.find('select[name$="-language"]');
-            var $entryPointField = $form.find('.entry-point-field');
-            var selectedText = $langSelect.find('option:selected').text();
-            // Show entry point only for Java languages
-            if (selectedText.toLowerCase().indexOf('java') !== -1) {
-                $entryPointField.show();
-            } else {
-                $entryPointField.hide();
+            // Handle entry point visibility based on language selection for harness form
+            function updateEntryPointVisibility($form) {
+                var $langSelect = $form.find('select[name$="-language"]');
+                var $entryPointField = $form.find('.entry-point-field');
+                var selectedText = $langSelect.find('option:selected').text();
+                // Show entry point only for Java languages
+                if (selectedText.toLowerCase().indexOf('java') !== -1) {
+                    $entryPointField.show();
+                } else {
+                    $entryPointField.hide();
+                }
             }
-        }
 
-        // Handle language change
-        $('#harness-forms').on('change', 'select[name$="-language"]', function() {
-            var $form = $(this).closest('.harness-form');
-            updateEntryPointVisibility($form);
-        });
+            // Handle language change
+            $('#harness-forms').on('change', 'select[name$="-language"]', function() {
+                var $form = $(this).closest('.harness-form');
+                updateEntryPointVisibility($form);
+            });
 
-        // Initialize entry point visibility on page load
-        $('#harness-forms .harness-form').each(function() {
-            updateEntryPointVisibility($(this));
+            // Initialize entry point visibility on page load
+            $('#harness-forms .harness-form').each(function() {
+                updateEntryPointVisibility($(this));
+            });
+
+            // Initialize harness toggle state based on existing harness
+            var hasExistingHarness = $('#harness-forms .harness-form').filter(function() {
+                var $form = $(this);
+                var hasId = $form.find('input[name$="-id"]').val();
+                return !!hasId;
+            }).length > 0;
+
+            if (hasExistingHarness) {
+                // Show expanded by default if harness exists
+                $('#harness-toggle').removeClass('closed').addClass('open');
+                $('#harness-content').show();
+            }
         });
     </script>
 {% endblock %}
@@ -497,13 +510,17 @@
 
         <hr style="margin: 2em 0;">
 
-        <h3>{{ _('Harness') }}</h3>
-        <p class="help-block">
-            {{ _("Hidden test code that wraps student submissions. Students can download this via 'Download Tester'. Only one harness per problem is supported.") }}
-        </p>
+        <h3 class="toggle closed" id="harness-toggle" style="cursor: pointer;">
+            <i class="fa fa-chevron-right fa-fw"></i>
+            {{ _('Harness') }}
+        </h3>
+        <div class="toggled" id="harness-content" style="display: none;">
+            <p class="help-block">
+                {{ _("Hidden test code that wraps student submissions. Students can download this via 'Download Tester'. Only one harness per problem is supported.") }}
+            </p>
 
-        {{ harness_formset.management_form }}
-        <div id="harness-forms">
+            {{ harness_formset.management_form }}
+            <div id="harness-forms">
         {% for form in harness_formset %}
             <div class="harness-form panel" style="border: 1px solid #ddd; padding: 1em; margin-bottom: 1em;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em;">
@@ -549,6 +566,7 @@
                 </div>
             </div>
         {% endfor %}
+            </div>
         </div>
 
         <hr style="margin: 2em 0;">
