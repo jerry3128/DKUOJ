@@ -210,6 +210,21 @@ class ProblemDataCompiler(object):
         if hints:
             init['hints'] = hints
 
+        # Add harness configuration
+        harnesses = self.problem.harnesses.select_related('language').all()
+        if harnesses.exists():
+            init['harness_grader'] = {}
+            for harness in harnesses:
+                lang_key = harness.language.key
+                harness_config = {
+                    'code': harness.harness_code,
+                }
+                if harness.skip_precompile:
+                    harness_config['skip_precompile'] = harness.skip_precompile
+                if harness.run_student_main:
+                    harness_config['run_student_main'] = harness.run_student_main
+                init['harness_grader'][lang_key] = harness_config
+
         return init
 
     def compile(self):

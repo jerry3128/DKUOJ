@@ -3,6 +3,8 @@
 {% block js_media %}
     <script type="text/javascript" src="{{ static('libs/jquery-sortable.js') }}"></script>
     <script type="text/javascript" src="{{ static('libs/featherlight/featherlight.min.js') }}"></script>
+    <script type="text/javascript" src="{{ ACE_URL }}/ace.js"></script>
+    <script type="text/javascript" src="{{ static('django_ace/widget.js') }}"></script>
     <script type="text/javascript">
         window.valid_files = {{ valid_files_json }};
         $(function () {
@@ -248,6 +250,61 @@
                 }
                 $this.prop('checked', filled).trigger('change');
             });
+
+            // Handle delete checkbox visibility toggle for harness form
+            $('#harness-forms').on('change', 'input[type="checkbox"][name$="-DELETE"]', function() {
+                var $form = $(this).closest('.harness-form');
+                if ($(this).is(':checked')) {
+                    $form.css('opacity', '0.5');
+                } else {
+                    $form.css('opacity', '1');
+                }
+            });
+
+            // Initialize harness form opacity on page load
+            $('#harness-forms input[type="checkbox"][name$="-DELETE"]').each(function() {
+                var $form = $(this).closest('.harness-form');
+                if ($(this).is(':checked')) {
+                    $form.css('opacity', '0.5');
+                } else {
+                    $form.css('opacity', '1');
+                }
+            });
+
+            // Initialize harness toggle state based on existing harness
+            var hasExistingHarness = $('#harness-forms .harness-form').filter(function() {
+                var $form = $(this);
+                var hasId = $form.find('input[name$="-id"]').val();
+                return !!hasId;
+            }).length > 0;
+
+            if (hasExistingHarness) {
+                // Show expanded by default if harness exists
+                $('#harness-toggle').removeClass('closed').addClass('open');
+                $('#harness-content').show();
+            }
+
+            // Dynamic Ace editor mode based on language selection
+            window.languageAceMap = {{ language_ace_map }};
+
+            $('#harness-forms').on('change', 'select[name$="-language"]', function() {
+                var langId = $(this).val();
+                var aceMode = window.languageAceMap[langId] || 'java';
+                var $form = $(this).closest('.harness-form');
+                // Find the ace widget wrapper div (has id like "ace_harnesses-0-harness_code")
+                var $widget = $form.find('.django-ace-widget');
+                if ($widget.length) {
+                    // The editor is attached to the first child div
+                    var editorDiv = $widget[0].firstChild;
+                    var editor = ace.edit(editorDiv);
+                    editor.getSession().setMode('ace/mode/' + aceMode);
+                }
+            });
+
+            // Initialize editor mode on page load
+            $('#harness-forms select[name$="-language"]').each(function() {
+                $(this).trigger('change');
+            });
         });
     </script>
 {% endblock %}
@@ -447,8 +504,72 @@
             {% endfor %}
             </tbody>
         </table>
-        <input type="submit" value="{{ _('Submit!') }}" class="button">
         <a id="add-case-row" href="#"><i class="fa fa-plus"></i> {{ _('Add new case') }}</a>
+
+        <hr style="margin: 2em 0;">
+
+        <h3 class="toggle closed" id="harness-toggle" style="cursor: pointer;">
+            <i class="fa fa-chevron-right fa-fw"></i>
+            {{ _('Harness') }}
+        </h3>
+        <div class="toggled" id="harness-content" style="display: none;">
+            <p class="help-block">
+                {{ _("Hidden test code that wraps student submissions. Students can download this via 'Download Tester'. Only one harness per problem is supported.") }}
+            </p>
+
+            {{ harness_formset.management_form }}
+            <div id="harness-forms">
+        {% for form in harness_formset %}
+            <div class="harness-form panel" style="border: 1px solid #ddd; padding: 1em; margin-bottom: 1em;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em;">
+                    <h4 style="margin: 0;">{{ _('Harness Configuration') }}</h4>
+                    {% if harness_formset.can_delete %}
+                        <label style="color: #c00;">
+                            {{ form.DELETE }} {{ _('Delete') }}
+                        </label>
+                    {% endif %}
+                </div>
+                {{ form.id }}
+                <div style="margin-bottom: 1em;">
+                    <label>{{ _('Language') }}</label>
+                    {{ form.language }}
+                    {% if form.language.errors %}
+                        <ul class="errorlist">{% for error in form.language.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                    {% endif %}
+                </div>
+                <div style="margin-bottom: 1em;">
+                    <label>
+                        {{ form.skip_precompile }}
+                        {{ _('Skip pre-compilation') }}
+                    </label>
+                    <p class="help-block" style="margin: 0.25em 0 0 0; font-size: 0.9em; color: #666;">
+                        {{ _('Enable if student code references classes/functions only defined in the harness (e.g., hidden APIs).') }}
+                    </p>
+                </div>
+                <div style="margin-bottom: 1em;">
+                    <label>
+                        {{ form.run_student_main }}
+                        {{ _('Run student main') }}
+                    </label>
+                    <p class="help-block" style="margin: 0.25em 0 0 0; font-size: 0.9em; color: #666;">
+                        {{ _('If enabled, student code is the entry point; harness provides hidden APIs.') }}
+                    </p>
+                </div>
+                <div>
+                    <label>{{ _('Harness Code') }}</label>
+                    {{ form.harness_code }}
+                    {% if form.harness_code.errors %}
+                        <ul class="errorlist">{% for error in form.harness_code.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+            </div>
+        </div>
+
+        <hr style="margin: 2em 0;">
+
+        <input type="submit" value="{{ _('Submit!') }}" class="button">
     </form>
     <div style="display: none" class="generator-args-editor"><textarea></textarea><a class="button">{{ _('Save') }}</a></div>
     <div style="display: none" class="batch-dependencies-editor"><textarea></textarea><a class="button">{{ _('Save') }}</a></div>

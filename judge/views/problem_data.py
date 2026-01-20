@@ -10,6 +10,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.forms import BaseModelFormSet, HiddenInput, ModelForm, NumberInput, Select, formset_factory
+from django.forms.models import inlineformset_factory
 from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
@@ -18,8 +19,9 @@ from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
 from django.views.generic import DetailView
 
+from django_ace import AceWidget
 from judge.highlight_code import highlight_code
-from judge.models import Problem, ProblemData, ProblemTestCase, Submission, problem_data_storage
+from judge.models import Problem, ProblemData, ProblemHarness, ProblemTestCase, Submission, problem_data_storage
 from judge.utils.problem_data import ProblemDataCompiler
 from judge.utils.unicode import utf8text
 from judge.utils.views import TitleMixin, add_file_response
@@ -102,6 +104,32 @@ class ProblemCaseFormSet(formset_factory(ProblemCaseForm, formset=BaseModelFormS
         return form
 
 
+class ProblemHarnessForm(ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filter to only Java and Python language variants
+        from judge.models import Language
+        self.fields['language'].queryset = Language.objects.filter(
+            common_name__in=['Java', 'Python'],
+        ).order_by('common_name', 'key')
+
+    class Meta:
+        model = ProblemHarness
+        fields = ['language', 'skip_precompile', 'run_student_main', 'harness_code']
+        widgets = {
+            'harness_code': AceWidget(mode='java', theme='chrome', width='100%', height='300px'),
+        }
+
+
+ProblemHarnessFormSet = inlineformset_factory(
+    Problem, ProblemHarness,
+    form=ProblemHarnessForm,
+    extra=1,
+    max_num=1,
+    can_delete=True,
+)
+
+
 class ProblemManagerMixin(LoginRequiredMixin, ProblemMixin, DetailView):
     def get_object(self, queryset=None):
         problem = super(ProblemManagerMixin, self).get_object(queryset)
@@ -171,6 +199,14 @@ class ProblemDataView(TitleMixin, ProblemManagerMixin):
         return ProblemCaseFormSet(data=self.request.POST if post else None, prefix='cases', valid_files=files,
                                   queryset=ProblemTestCase.objects.filter(dataset_id=self.object.pk).order_by('order'))
 
+    def get_harness_formset(self, post=False):
+        return ProblemHarnessFormSet(
+            data=self.request.POST if post else None,
+            instance=self.object,
+            prefix='harnesses',
+            queryset=ProblemHarness.objects.filter(problem=self.object),
+        )
+
     def get_valid_files(self, data, post=False) -> List[str]:
         try:
             if post and 'problem-data-zipfile-clear' in self.request.POST:
@@ -197,6 +233,21 @@ class ProblemDataView(TitleMixin, ProblemManagerMixin):
 
         context['cases_formset'] = self.get_case_formset(valid_files)
         context['all_case_forms'] = chain(context['cases_formset'], [context['cases_formset'].empty_form])
+
+        if 'harness_formset' not in context:
+            context['harness_formset'] = self.get_harness_formset()
+
+        context['ACE_URL'] = settings.ACE_URL
+
+        # Add language ace modes for harness editor
+        from judge.models import Language
+        harness_languages = Language.objects.filter(
+            common_name__in=['Java', 'Python'],
+        ).values('id', 'ace')
+        context['language_ace_map'] = mark_safe(json.dumps({
+            lang['id']: lang['ace'] for lang in harness_languages
+        }))
+
         return context
 
     def post(self, request, *args, **kwargs):
@@ -210,17 +261,24 @@ class ProblemDataView(TitleMixin, ProblemManagerMixin):
             data_form.zip_valid = False
 
         cases_formset = self.get_case_formset(valid_files, post=True)
-        if data_form.is_valid() and cases_formset.is_valid():
+        harness_formset = self.get_harness_formset(post=True)
+
+        if data_form.is_valid() and cases_formset.is_valid() and harness_formset.is_valid():
             data = data_form.save()
             for case in cases_formset.save(commit=False):
                 case.dataset_id = problem.id
                 case.save()
             for case in cases_formset.deleted_objects:
                 case.delete()
+
+            # Save harness formset
+            harness_formset.save()
+
             ProblemDataCompiler.generate(problem, data, problem.cases.order_by('order'), valid_files)
             return HttpResponseRedirect(request.get_full_path())
-        return self.render_to_response(self.get_context_data(data_form=data_form, cases_formset=cases_formset,
-                                                             valid_files=valid_files))
+        return self.render_to_response(self.get_context_data(
+            data_form=data_form, cases_formset=cases_formset,
+            harness_formset=harness_formset, valid_files=valid_files))
 
     put = post
 
@@ -336,7 +394,37 @@ def download_tester(request, problem):
     if not problem.view_tester:
         raise Http404()
 
-    # Check if MainTest.java exists
+    # Get available harnesses
+    harnesses = problem.harnesses.select_related('language').all()
+
+    if harnesses.exists():
+        # Get requested language from query param, or default to first harness
+        lang_key = request.GET.get('lang')
+        if lang_key:
+            harness = harnesses.filter(language__key=lang_key).first()
+        else:
+            harness = harnesses.first()
+
+        if not harness:
+            raise Http404()
+
+        # Determine filename based on language
+        if harness.language.key.startswith('JAVA'):
+            import re
+            class_match = re.search(r'public\s+class\s+(\w+)', harness.harness_code)
+            harness_class = class_match.group(1) if class_match else 'MainTest'
+            filename = '%s.java' % harness_class
+        elif harness.language.key in ('PY3', 'PYPY3', 'PY2', 'PYPY'):
+            filename = 'tester.py'
+        else:
+            filename = 'tester.txt'
+
+        # Return harness code as downloadable file
+        response = HttpResponse(harness.harness_code, content_type='application/octet-stream')
+        response['Content-Disposition'] = 'attachment; filename="%s"' % filename
+        return response
+
+    # Fall back to legacy MainTest.java if it exists
     filename = 'MainTest.java'
     path = os.path.join(problem.code, filename)
 
