@@ -283,6 +283,28 @@
                 $('#harness-toggle').removeClass('closed').addClass('open');
                 $('#harness-content').show();
             }
+
+            // Dynamic Ace editor mode based on language selection
+            window.languageAceMap = {{ language_ace_map }};
+
+            $('#harness-forms').on('change', 'select[name$="-language"]', function() {
+                var langId = $(this).val();
+                var aceMode = window.languageAceMap[langId] || 'java';
+                var $form = $(this).closest('.harness-form');
+                // Find the ace widget wrapper div (has id like "ace_harnesses-0-harness_code")
+                var $widget = $form.find('.django-ace-widget');
+                if ($widget.length) {
+                    // The editor is attached to the first child div
+                    var editorDiv = $widget[0].firstChild;
+                    var editor = ace.edit(editorDiv);
+                    editor.getSession().setMode('ace/mode/' + aceMode);
+                }
+            });
+
+            // Initialize editor mode on page load
+            $('#harness-forms select[name$="-language"]').each(function() {
+                $(this).trigger('change');
+            });
         });
     </script>
 {% endblock %}

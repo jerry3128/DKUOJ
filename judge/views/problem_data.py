@@ -238,6 +238,16 @@ class ProblemDataView(TitleMixin, ProblemManagerMixin):
             context['harness_formset'] = self.get_harness_formset()
 
         context['ACE_URL'] = settings.ACE_URL
+
+        # Add language ace modes for harness editor
+        from judge.models import Language
+        harness_languages = Language.objects.filter(
+            common_name__in=['Java', 'Python'],
+        ).values('id', 'ace')
+        context['language_ace_map'] = mark_safe(json.dumps({
+            lang['id']: lang['ace'] for lang in harness_languages
+        }))
+
         return context
 
     def post(self, request, *args, **kwargs):
