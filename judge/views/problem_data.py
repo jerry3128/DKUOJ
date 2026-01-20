@@ -116,7 +116,7 @@ class ProblemHarnessForm(ModelForm):
 
     class Meta:
         model = ProblemHarness
-        fields = ['language', 'entry_point', 'skip_precompile', 'run_student_main', 'harness_code']
+        fields = ['language', 'skip_precompile', 'run_student_main', 'harness_code']
         widgets = {
             'harness_code': AceWidget(mode='java', theme='chrome', width='100%', height='300px'),
         }
@@ -401,7 +401,10 @@ def download_tester(request, problem):
 
         # Determine filename based on language
         if harness.language.key.startswith('JAVA'):
-            filename = '%s.java' % (harness.entry_point or 'MainTest')
+            import re
+            class_match = re.search(r'public\s+class\s+(\w+)', harness.harness_code)
+            harness_class = class_match.group(1) if class_match else 'MainTest'
+            filename = '%s.java' % harness_class
         elif harness.language.key in ('PY3', 'PYPY3', 'PY2', 'PYPY'):
             filename = 'tester.py'
         else:

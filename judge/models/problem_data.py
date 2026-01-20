@@ -108,8 +108,6 @@ class ProblemHarness(models.Model):
     language = models.ForeignKey('Language', verbose_name=_('language'), on_delete=models.CASCADE)
     harness_code = models.TextField(verbose_name=_('harness code'),
         help_text=_('Hidden test code compiled/run with the student submission.'))
-    entry_point = models.CharField(max_length=100, blank=True, verbose_name=_('entry point'),
-        help_text=_('For Java: class name with main(). For Python: leave blank.'))
     skip_precompile = models.BooleanField(default=False, verbose_name=_('skip pre-compilation'),
         help_text=_('Enable if student code references classes/functions defined in the harness. '
                     'The harness grader will handle compilation instead.'))

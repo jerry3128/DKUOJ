@@ -271,30 +271,6 @@
                 }
             });
 
-            // Handle entry point visibility based on language selection for harness form
-            function updateEntryPointVisibility($form) {
-                var $langSelect = $form.find('select[name$="-language"]');
-                var $entryPointField = $form.find('.entry-point-field');
-                var selectedText = $langSelect.find('option:selected').text();
-                // Show entry point only for Java languages
-                if (selectedText.toLowerCase().indexOf('java') !== -1) {
-                    $entryPointField.show();
-                } else {
-                    $entryPointField.hide();
-                }
-            }
-
-            // Handle language change
-            $('#harness-forms').on('change', 'select[name$="-language"]', function() {
-                var $form = $(this).closest('.harness-form');
-                updateEntryPointVisibility($form);
-            });
-
-            // Initialize entry point visibility on page load
-            $('#harness-forms .harness-form').each(function() {
-                updateEntryPointVisibility($(this));
-            });
-
             // Initialize harness toggle state based on existing harness
             var hasExistingHarness = $('#harness-forms .harness-form').filter(function() {
                 var $form = $(this);
@@ -532,21 +508,12 @@
                     {% endif %}
                 </div>
                 {{ form.id }}
-                <div style="display: flex; gap: 1em; margin-bottom: 1em;">
-                    <div style="flex: 1;">
-                        <label>{{ _('Language') }}</label>
-                        {{ form.language }}
-                        {% if form.language.errors %}
-                            <ul class="errorlist">{% for error in form.language.errors %}<li>{{ error }}</li>{% endfor %}</ul>
-                        {% endif %}
-                    </div>
-                    <div class="entry-point-field" style="flex: 1;">
-                        <label>{{ _('Entry Point') }} <small>({{ _('e.g., MainTest for Java') }})</small></label>
-                        {{ form.entry_point }}
-                        {% if form.entry_point.errors %}
-                            <ul class="errorlist">{% for error in form.entry_point.errors %}<li>{{ error }}</li>{% endfor %}</ul>
-                        {% endif %}
-                    </div>
+                <div style="margin-bottom: 1em;">
+                    <label>{{ _('Language') }}</label>
+                    {{ form.language }}
+                    {% if form.language.errors %}
+                        <ul class="errorlist">{% for error in form.language.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+                    {% endif %}
                 </div>
                 <div style="margin-bottom: 1em;">
                     <label>

@@ -219,8 +219,6 @@ class ProblemDataCompiler(object):
                 harness_config = {
                     'code': harness.harness_code,
                 }
-                if harness.entry_point:
-                    harness_config['entry_point'] = harness.entry_point
                 if harness.skip_precompile:
                     harness_config['skip_precompile'] = harness.skip_precompile
                 if harness.run_student_main:

@@ -1223,7 +1223,6 @@ class ProblemClone(ProblemMixin, PermissionRequiredMixin, TitleMixin, SingleObje
             new_harness.problem = new_problem
             new_harness.language = original.language
             new_harness.harness_code = original.harness_code
-            new_harness.entry_point = original.entry_point
             new_harness.skip_precompile = original.skip_precompile
             new_harness.run_student_main = original.run_student_main
 
