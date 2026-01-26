@@ -25,15 +25,18 @@ The problem view has been redesigned for better usability:
 New commands and UI enhancements to simplify management:
 
 *   **Bulk User Import**: Easily onboard students using `python manage.py import_users_csv`.
+*   **Organization User Import**: A user-friendly frontend interface for importing users into organizations via CSV upload.
 *   **Contest Data Export**:
     *   `export_contest_scores`: Export final scores to CSV.
     *   `export_contest_submissions`: Download all contest submissions as a ZIP archive.
+*   **Contest PDF Export**: Generate a printable PDF containing all contest problems with proper formatting and math rendering.
 *   **Admin UI Enhancements**:
     *   **Clone Problem**: One-click button to duplicate existing problems.
     *   **Edit Test Data**: Quick access link to manage test cases directly from the problem list.
 
 ### Problem Management
 *   **Problem Templates**: Define starting code templates for specific languages to guide students.
+*   **Problem Harnesses**: Hidden test code (for Java/Python) that compiles together with the student's submission, enabling black-box testing of specific functions or classes.
 *   **Test Case Access**: Configurable permissions to allow users to download failed test cases or tester files for debugging.
 
 ## Original DMOJ Features
@@ -46,15 +49,15 @@ New commands and UI enhancements to simplify management:
 
 ## Todo / Roadmap
 
-- [ ] **Frontend Custom Grader Config**: Allow teachers to configure custom graders directly from the frontend without backend server access.
-- [x] **Comprehensive Contest Export**: Generate a PDF export containing all problem content, CSV for student scores, and zip for source code.
+- [x] **Frontend Custom Grader Config**: Allow teachers to configure custom graders directly from the frontend without backend server access.
+- [x] **Comprehensive Contest Export**: Generate a PDF export containing all problem content, CSV for student scores, and ZIP for source code.
 - [x] **Frontend Student Import**: Add a user-friendly frontend interface for the `import_users_csv` command.
 - [ ] **Enhanced Multi-Choice Support**: Improve configuration options for multi-choice problems.
 - [ ] **Auto Indexing**: Automatically index problems and contests when creating new ones.
-- [ ] **Disable Virtual Participation**: Disable virtual participation for some contests.
+- [x] **Disable Virtual Participation**: Disable virtual participation for some contests.
 - [ ] **Test Cases Editing**: Allow teachers to edit test cases directly from the frontend.
 - [ ] **Auto Rejudging**: Automatically rejudge submissions when a problem is pretested during the contest.
-- [ ] **NetID Login**: Let student login the website using their NetID.
+- [ ] **NetID Login**: Let students login to the website using their NetID.
 
 ## Installation
 
