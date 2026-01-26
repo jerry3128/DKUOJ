@@ -1,4 +1,4 @@
-# DMOJ: Modern Online Judge (Custom Fork)
+# DKU OJ
 
 ![](https://img.shields.io/github/actions/workflow/status/binghan1227/dmoj-web/build.yml?branch=customize)
 ![](https://img.shields.io/github/license/binghan1227/dmoj-web)
