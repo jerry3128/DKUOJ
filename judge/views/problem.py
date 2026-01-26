@@ -291,8 +291,13 @@ class ProblemDetail(ProblemMixin, SolvedProblemMixin, CommentedDetailView):
                 Prefetch('runtimeversion_set', RuntimeVersion.objects.order_by('priority')),
             )
             form.fields['source'].widget.theme = self.request.profile.resolved_ace_theme
-            if self.request.profile.language:
+            # Set ACE mode to user's language only if it's in the allowed languages
+            # Otherwise use the first allowed language
+            usable_languages = form.fields['language'].queryset
+            if self.request.profile.language and self.request.profile.language in usable_languages:
                 form.fields['source'].widget.mode = self.request.profile.language.ace
+            elif usable_languages.exists():
+                form.fields['source'].widget.mode = usable_languages.first().ace
             context['form'] = form
             context['ACE_URL'] = settings.ACE_URL
 
