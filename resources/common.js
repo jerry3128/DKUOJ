@@ -259,6 +259,12 @@ $(function () {
     });
 });
 
+window.addEventListener('pageshow', function (event) {
+    if (event.persisted) {
+        $("button[type=submit], input[type=submit]").prop('disabled', false);
+    }
+});
+
 window.notification_template = {
     icon: '/logo.png'
 };
