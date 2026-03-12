@@ -38,7 +38,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.db.utils import IntegrityError
 
-from judge.models import Organization, Profile
+from judge.models import Class, Organization, Profile
 
 
 class DryRunRollback(Exception):
@@ -96,6 +96,10 @@ class Command(BaseCommand):
             action='store_true',
             help='Parse and validate but do not commit any changes to the database.',
         )
+        parser.add_argument(
+            '--class-slug',
+            help='Slug of the class to add all users to (must belong to the target organization).',
+        )
 
     def handle(self, *args, **opts):
         csv_path = Path(opts['csv_path']).expanduser().resolve()
@@ -117,12 +121,23 @@ class Command(BaseCommand):
                     ' or use --create-org-if-missing.',
                 )
 
+        # Resolve target class if specified
+        target_class = None
+        class_slug = opts.get('class_slug')
+        if class_slug:
+            target_class = self._resolve_class(class_slug, org)
+            if target_class is None:
+                raise CommandError(
+                    f"Class with slug '{class_slug}' not found"
+                    + (f' in organization {org.slug}' if org else '') + '.',
+                )
+
         rows = self._read_csv(csv_path)
         if not rows:
             self.stdout.write(self.style.WARNING('No rows found in CSV. Nothing to do.'))
             return
 
-        created = updated = skipped = errors = org_linked = 0
+        created = updated = skipped = errors = org_linked = class_linked = 0
 
         self.stdout.write(
             self.style.NOTICE(
@@ -134,6 +149,12 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.NOTICE(
                     f'Target organization: {org.slug} ({org.name})',
+                ),
+            )
+        if target_class:
+            self.stdout.write(
+                self.style.NOTICE(
+                    f'Target class: {target_class.slug} ({target_class.name})',
                 ),
             )
 
@@ -152,6 +173,11 @@ class Command(BaseCommand):
                         # link user to org (no-op if already a member)
                         if self._add_user_to_org(user, org):
                             org_linked += 1
+
+                    if target_class and user:
+                        # link user to class (no-op if already a member)
+                        if self._add_user_to_class(user, target_class):
+                            class_linked += 1
 
                     if opts['dry_run']:
                         # Trigger rollback for this iteration only; not counted as an error.
@@ -172,7 +198,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f'Done. Created: {created}, Updated: {updated}, '
-                f'Skipped: {skipped}, Org-linked: {org_linked}, Errors: {errors}',
+                f'Skipped: {skipped}, Org-linked: {org_linked}, Class-linked: {class_linked}, Errors: {errors}',
             ),
         )
 
@@ -221,6 +247,19 @@ class Command(BaseCommand):
                     ),
                 )
                 return org
+            return None
+
+    def _resolve_class(self, slug: str, org: Organization = None):
+        """
+        Look up a Class by slug, optionally restricted to the given organization.
+        Returns None if not found.
+        """
+        try:
+            if org:
+                return Class.objects.get(slug=slug, organization=org)
+            else:
+                return Class.objects.get(slug=slug)
+        except Class.DoesNotExist:
             return None
 
     def _ensure_profile(self, user: User) -> Profile:
@@ -284,7 +323,7 @@ class Command(BaseCommand):
             raise CommandError(f"IntegrityError for '{username}': {exc}")
 
     def _add_user_to_org(self, user: User, org: Organization) -> bool:
-        """Attach the user’s profile to the given organization.  Returns True if
+        """Attach the user's profile to the given organization.  Returns True if
         a new membership link was created or ensured."""
         profile = self._ensure_profile(user)
         # Check if membership already exists
@@ -294,4 +333,14 @@ class Command(BaseCommand):
         # is `profile.organizations`, which would be equivalent.  We use the
         # reverse here for clarity.
         org.members.add(profile)
+        return True
+
+    def _add_user_to_class(self, user: User, target_class: Class) -> bool:
+        """Attach the user's profile to the given class.  Returns True if
+        a new membership link was created."""
+        profile = self._ensure_profile(user)
+        # Check if membership already exists
+        if target_class.members.filter(id=profile.id).exists():
+            return False
+        target_class.members.add(profile)
         return True

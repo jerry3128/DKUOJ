@@ -1,0 +1,28 @@
+{
+  "migrations": [
+    {
+      "target_organization": {
+        "slug": "cs101",
+        "name": "CS101 Introduction to Programming",
+        "short_name": "CS101",
+        "create_if_missing": true
+      },
+      "source_organizations": [
+        {
+          "slug": "cs101-fall2025",
+          "class_name": "Fall 2025",
+          "class_slug": "fall2025",
+          "make_admins_org_admins": false,
+          "make_admins_class_admins": true
+        },
+        {
+          "slug": "cs101-spring2026",
+          "class_name": "Spring 2026",
+          "class_slug": "spring2026",
+          "make_admins_org_admins": true,
+          "make_admins_class_admins": true
+        }
+      ]
+    }
+  ]
+}

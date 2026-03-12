@@ -27,7 +27,7 @@ from judge.utils.views import DiggPaginatorMixin, QueryStringSortMixin, TitleMix
 __all__ = ['OrganizationList', 'OrganizationHome', 'OrganizationUsers', 'OrganizationMembershipChange',
            'JoinOrganization', 'LeaveOrganization', 'EditOrganization', 'RequestJoinOrganization',
            'OrganizationRequestDetail', 'OrganizationRequestView', 'OrganizationRequestLog',
-           'KickUserWidgetView', 'ClassHome', 'RequestJoinClass', 'OrganizationImportUsers']
+           'KickUserWidgetView', 'ClassHome', 'RequestJoinClass', 'OrganizationImportUsers', 'CreateClass']
 
 
 def users_for_template(users, order):
@@ -499,10 +499,76 @@ class RequestJoinClass(LoginRequiredMixin, ClassMixin, FormView):
         )))
 
 
+class ClassCreateForm(forms.ModelForm):
+    class Meta:
+        model = Class
+        fields = ['name', 'slug', 'description', 'access_code']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 4}),
+        }
+
+    def __init__(self, *args, organization=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.organization = organization
+
+    def clean_slug(self):
+        slug = self.cleaned_data['slug']
+        if self.organization and Class.objects.filter(organization=self.organization, slug=slug).exists():
+            raise forms.ValidationError(_('A class with this slug already exists in this organization.'))
+        return slug
+
+
+class CreateClass(LoginRequiredMixin, OrganizationMixin, FormView):
+    template_name = 'organization/create_class.html'
+    form_class = ClassCreateForm
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['organization'] = self.object
+        context['title'] = _('Create Class - %s') % self.object.name
+        return context
+
+    def get_object(self, queryset=None):
+        return get_object_or_404(Organization, id=self.kwargs['pk'])
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if not self.can_edit_organization():
+            return generic_message(request, _('Access Denied'),
+                                   _('You do not have permission to create classes for this organization.'), status=403)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['organization'] = self.object
+        return kwargs
+
+    def form_valid(self, form):
+        new_class = form.save(commit=False)
+        new_class.organization = self.object
+        new_class.is_active = True
+        new_class.save()
+        # Add the creator as an admin of the class
+        new_class.admins.add(self.request.profile)
+        messages.success(self.request, _('Class "%s" created successfully.') % new_class.name)
+        return HttpResponseRedirect(new_class.get_absolute_url())
+
+
 class OrganizationImportForm(forms.Form):
     csv_file = forms.FileField(label=gettext_lazy('CSV File'))
+    target_class = forms.ModelChoiceField(
+        queryset=Class.objects.none(),
+        required=False,
+        label=gettext_lazy('Target Class'),
+        empty_label=gettext_lazy('-- No class (organization only) --'),
+    )
     update_existing = forms.BooleanField(required=False, label=gettext_lazy('Update existing users'))
     activate = forms.BooleanField(required=False, initial=True, label=gettext_lazy('Activate users'))
+
+    def __init__(self, *args, organization=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if organization:
+            self.fields['target_class'].queryset = organization.classes.filter(is_active=True).order_by('name')
 
 
 class OrganizationImportUsers(LoginRequiredMixin, OrganizationMixin, FormView):
@@ -519,6 +585,11 @@ class OrganizationImportUsers(LoginRequiredMixin, OrganizationMixin, FormView):
     def get_object(self, queryset=None):
         return get_object_or_404(Organization, id=self.kwargs['pk'])
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['organization'] = self.object
+        return kwargs
+
     def dispatch(self, request, *args, **kwargs):
         self.object = self.get_object()
         if not self.can_edit_organization():
@@ -530,6 +601,7 @@ class OrganizationImportUsers(LoginRequiredMixin, OrganizationMixin, FormView):
         csv_file = form.cleaned_data['csv_file']
         update_existing = form.cleaned_data['update_existing']
         activate = form.cleaned_data['activate']
+        target_class = form.cleaned_data.get('target_class')
 
         from judge.utils.import_export import process_user_csv
         # We need to read the file content, process_user_csv expects an open text file or iterable of lines
@@ -539,7 +611,7 @@ class OrganizationImportUsers(LoginRequiredMixin, OrganizationMixin, FormView):
         if hasattr(csv_file, 'seek'):
             csv_file.seek(0)
 
-        result = process_user_csv(csv_file, organization=self.object,
+        result = process_user_csv(csv_file, organization=self.object, target_class=target_class,
                                   update_existing=update_existing, activate=activate)
 
         return self.render_to_response(self.get_context_data(form=form, result=result))

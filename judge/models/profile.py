@@ -122,7 +122,8 @@ class Class(models.Model):
         if user.has_perm('judge.edit_all_organization'):
             return cls.objects.all()
 
-        return cls.objects.filter(contest__organizations__admins=user.profile) | cls.objects.filter(admins=user.profile)
+        return (cls.objects.filter(organization__admins=user.profile) |
+                cls.objects.filter(admins=user.profile)).distinct()
 
     def __str__(self):
         return _('%(class)s in %(organization)s') % {'class': self.name, 'organization': self.organization.name}
@@ -334,6 +335,9 @@ class Profile(models.Model):
         permissions = (
             ('test_site', _('Shows in-progress development stuff')),
             ('totp', _('Edit TOTP settings')),
+            ('impersonate_org', _('Impersonate members of organizations they admin')),
+            ('impersonate_class', _('Impersonate members of classes they admin')),
+            ('impersonate_contest', _('Impersonate participants of contests they author or curate')),
         )
         verbose_name = _('user profile')
         verbose_name_plural = _('user profiles')

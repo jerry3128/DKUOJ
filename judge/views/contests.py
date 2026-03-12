@@ -218,6 +218,7 @@ class ContestMixin(object):
         context['is_tester'] = self.is_tester
         context['is_spectator'] = self.is_spectator
         context['can_edit'] = self.can_edit
+        context['is_org_admin'] = self.object.is_viewable_by_org_admin(self.request.user)
 
         if not self.object.og_image or not self.object.summary:
             metadata = generate_opengraph('generated-meta-contest:%d' % self.object.id,
@@ -321,6 +322,14 @@ class ContestClone(ContestMixin, PermissionRequiredMixin, TitleMixin, SingleObje
     template_name = 'contest/clone.html'
     form_class = ContestCloneForm
     permission_required = 'judge.clone_contest'
+
+    def has_permission(self):
+        if super().has_permission():
+            return True
+        if not self.request.user.is_authenticated:
+            return False
+        contest = self.get_object()
+        return contest.is_viewable_by_org_admin(self.request.user)
 
     def form_valid(self, form):
         contest = self.object

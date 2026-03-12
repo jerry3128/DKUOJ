@@ -11,7 +11,7 @@ from django.utils.html import format_html
 from django.utils.translation import gettext, gettext_lazy as _, ngettext
 from reversion.admin import VersionAdmin
 
-from judge.models import LanguageLimit, Problem, ProblemClarification, ProblemPointsVote, ProblemTemplate, \
+from judge.models import Class, LanguageLimit, Problem, ProblemClarification, ProblemPointsVote, ProblemTemplate, \
     ProblemTranslation, Profile, Solution
 from judge.utils.views import NoBatchDeleteMixin
 from judge.widgets import AdminHeavySelect2MultipleWidget, AdminMartorWidget, AdminSelect2MultipleWidget, \
@@ -31,6 +31,25 @@ class ProblemForm(ModelForm):
             'placeholder': gettext('Describe the changes you made (optional)'),
         })
 
+    def clean(self):
+        cleaned_data = super().clean()
+        organizations = cleaned_data.get('organizations')
+        classes = cleaned_data.get('classes')
+
+        if classes and organizations:
+            org_ids = set(organizations.values_list('id', flat=True))
+            invalid_classes = classes.exclude(organization_id__in=org_ids)
+            if invalid_classes.exists():
+                raise forms.ValidationError(
+                    _('Selected classes must belong to selected organizations.'),
+                )
+        elif classes and not organizations:
+            raise forms.ValidationError(
+                _('You must select organizations before selecting classes.'),
+            )
+
+        return cleaned_data
+
     class Meta:
         widgets = {
             'authors': AdminHeavySelect2MultipleWidget(data_view='profile_select2'),
@@ -38,6 +57,7 @@ class ProblemForm(ModelForm):
             'testers': AdminHeavySelect2MultipleWidget(data_view='profile_select2'),
             'banned_users': AdminHeavySelect2MultipleWidget(data_view='profile_select2'),
             'organizations': AdminHeavySelect2MultipleWidget(data_view='organization_select2'),
+            'classes': AdminHeavySelect2MultipleWidget(data_view='class_select2'),
             'types': AdminSelect2MultipleWidget,
             'group': AdminSelect2Widget,
             'description': AdminMartorWidget(attrs={'data-markdownfy-url': reverse_lazy('problem_preview')}),
@@ -129,7 +149,7 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         (None, {
             'fields': (
                 'code', 'name', 'is_public', 'is_manually_managed', 'date', 'authors', 'curators', 'testers',
-                'organizations', 'submission_source_visibility_mode', 'is_full_markup',
+                'organizations', 'classes', 'submission_source_visibility_mode', 'is_full_markup',
                 'view_test_cases', 'view_tester',
                 'description', 'license',
             ),
@@ -173,7 +193,7 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
     def get_readonly_fields(self, request, obj=None):
         fields = self.readonly_fields
         if not request.user.has_perm('judge.create_private_problem'):
-            fields += ('organizations',)
+            fields += ('organizations', 'classes')
             if not request.user.has_perm('judge.change_public_visibility'):
                 fields += ('is_public',)
         if not request.user.has_perm('judge.change_manually_managed'):
@@ -238,15 +258,23 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
             kwargs['widget'] = CheckboxSelectMultipleWithSelectAll()
         return super(ProblemAdmin, self).formfield_for_manytomany(db_field, request, **kwargs)
 
-    def get_form(self, *args, **kwargs):
-        form = super(ProblemAdmin, self).get_form(*args, **kwargs)
+    def get_form(self, request, obj=None, **kwargs):
+        form = super(ProblemAdmin, self).get_form(request, obj, **kwargs)
         form.base_fields['authors'].queryset = Profile.objects.all()
+        if 'classes' in form.base_fields:
+            form.base_fields['classes'].queryset = Class.get_visible_classes(request.user)
         return form
 
+    class Media:
+        js = ('admin_class_filter.js',)
+
     def save_model(self, request, obj, form, change):
-        # `organizations` will not appear in `cleaned_data` if user cannot edit it
-        if form.changed_data and 'organizations' in form.changed_data:
-            obj.is_organization_private = bool(form.cleaned_data['organizations'])
+        # `organizations` and `classes` will not appear in `cleaned_data` if user cannot edit them
+        if form.changed_data:
+            if 'organizations' in form.changed_data or 'classes' in form.changed_data:
+                has_orgs = form.cleaned_data.get('organizations')
+                has_classes = form.cleaned_data.get('classes')
+                obj.is_organization_private = bool(has_orgs or has_classes)
 
         if form.cleaned_data.get('is_public') and not request.user.has_perm('judge.change_public_visibility'):
             if not obj.is_organization_private:
@@ -257,7 +285,7 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         super(ProblemAdmin, self).save_model(request, obj, form, change)
         if (
             form.changed_data and
-            any(f in form.changed_data for f in ('is_public', 'organizations', 'points', 'partial'))
+            any(f in form.changed_data for f in ('is_public', 'organizations', 'classes', 'points', 'partial'))
         ):
             self._rescore(request, obj.id)
 

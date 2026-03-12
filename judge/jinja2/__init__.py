@@ -7,6 +7,7 @@ from mptt.utils import get_cached_trees
 from statici18n.templatetags.statici18n import inlinei18n
 
 from judge.highlight_code import highlight_code
+from judge.impersonation import can_impersonate_user
 from judge.user_translations import gettext
 from . import (camo, datetime, filesize, format, gravatar, language, markdown, rating, reference, render, social,
                spaceless, submission, timedelta)
@@ -21,6 +22,7 @@ registry.filter('roundfloat', round)
 registry.function('inlinei18n', inlinei18n)
 registry.function('mptt_tree', get_cached_trees)
 registry.function('user_trans', gettext)
+registry.function('can_impersonate_user', can_impersonate_user)
 
 
 @registry.function

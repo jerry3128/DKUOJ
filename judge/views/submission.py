@@ -20,6 +20,7 @@ from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, ListView
 
 from judge import event_poster as event
+from judge.comments import SubmissionCommentMixin
 from judge.highlight_code import highlight_code
 from judge.models import Contest, Language, Problem, ProblemTranslation, Profile, Submission
 from judge.models.problem import SubmissionSourceAccess
@@ -169,7 +170,7 @@ def group_test_cases(cases):
     return result, status, max_execution_time
 
 
-class SubmissionStatus(SubmissionDetailBase):
+class SubmissionStatus(SubmissionCommentMixin, SubmissionDetailBase):
     template_name = 'submission/status.html'
 
     def get_context_data(self, **kwargs):
@@ -194,7 +195,25 @@ class SubmissionStatus(SubmissionDetailBase):
         if first_failed:
             context['first_failed_case_id'] = first_failed.case
 
+        context['enable_comments'] = settings.DMOJ_ENABLE_COMMENTS
+        if settings.DMOJ_ENABLE_COMMENTS:
+            context.update(self.get_comment_context())
+
         return context
+
+    def post(self, request, *args, **kwargs):
+        try:
+            self.object = self.get_object()
+        except SubmissionPermissionDenied as e:
+            return self.no_permission(e.submission)
+
+        response, form = self.handle_comment_post(request)
+        if response is not None:
+            return response
+
+        context = self.get_context_data(object=self.object)
+        context['comment_form'] = form
+        return self.render_to_response(context)
 
 
 class SubmissionTestCaseQuery(SubmissionStatus):

@@ -126,3 +126,83 @@ class CommentedDetailView(TemplateResponseMixin, SingleObjectMixin, View):
         context['reply_cutoff'] = timezone.now() - settings.DMOJ_COMMENT_REPLY_TIMEFRAME
 
         return context
+
+
+class SubmissionCommentMixin:
+    """Standalone mixin for adding comment support to submission detail views.
+
+    Unlike CommentedDetailView, this does not inherit from TemplateResponseMixin, SingleObjectMixin, or View,
+    avoiding MRO conflicts when mixed with SubmissionDetailBase (which already inherits from DetailView).
+
+    Expects self.object (the submission) and self.request to be available.
+    """
+
+    def get_comment_page(self):
+        return 'sub:%d' % self.object.id
+
+    def is_comment_locked(self):
+        return (CommentLock.objects.filter(page=self.get_comment_page()).exists() and
+                not self.request.user.has_perm('judge.override_comment_lock'))
+
+    def get_comment_context(self):
+        context = {}
+        page = self.get_comment_page()
+        queryset = Comment.objects.filter(hidden=False, page=page)
+        context['has_comments'] = queryset.exists()
+        context['comment_lock'] = self.is_comment_locked()
+        queryset = queryset.select_related('author__user').defer('author__about')
+
+        if self.request.user.is_authenticated:
+            profile = self.request.profile
+            queryset = queryset.annotate(
+                my_vote=FilteredRelation('votes', condition=Q(votes__voter_id=profile.id)),
+            ).annotate(vote_score=Coalesce(F('my_vote__score'), Value(0)))
+            context['is_new_user'] = not self.request.user.is_staff and not profile.has_any_solves
+
+        context['comment_list'] = queryset
+        context['vote_hide_threshold'] = settings.DMOJ_COMMENT_VOTE_HIDE_THRESHOLD
+        context['reply_cutoff'] = timezone.now() - settings.DMOJ_COMMENT_REPLY_TIMEFRAME
+        context['comment_form'] = CommentForm(self.request, initial={'page': page, 'parent': None})
+
+        return context
+
+    def handle_comment_post(self, request):
+        """Handle comment form POST. Returns (response, form) tuple.
+
+        On success: (HttpResponseRedirect, None)
+        On HTTP error: (HttpResponse4xx, None)
+        On form validation failure: (None, invalid_form)
+        """
+        page = self.get_comment_page()
+
+        if self.is_comment_locked():
+            return HttpResponseForbidden(), None
+
+        parent = request.POST.get('parent')
+        if parent:
+            if len(parent) > 10:
+                return HttpResponseBadRequest(), None
+            try:
+                parent = int(parent)
+            except ValueError:
+                return HttpResponseBadRequest(), None
+            try:
+                parent_comment = Comment.objects.get(hidden=False, id=parent, page=page)
+            except Comment.DoesNotExist:
+                return HttpResponseNotFound(), None
+            if not (request.user.has_perm('judge.change_comment') or
+                    parent_comment.time > timezone.now() - settings.DMOJ_COMMENT_REPLY_TIMEFRAME):
+                return HttpResponseForbidden(), None
+
+        form = CommentForm(request, request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.author = request.profile
+            comment.page = page
+            with LockModel(write=(Comment, Revision, Version), read=(ContentType,)), revisions.create_revision():
+                revisions.set_user(request.user)
+                revisions.set_comment(_('Posted comment'))
+                comment.save()
+            return HttpResponseRedirect(request.path), None
+
+        return None, form

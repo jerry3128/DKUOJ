@@ -199,7 +199,7 @@ class ProblemTestCase(CommonDataMixin, TestCase):
             },
             'staff_problem_edit_public': {
                 'is_accessible_by': self.assertTrue,
-                'is_editable_by': self.assertTrue,
+                'is_editable_by': self.assertFalse,  # problem is not public, so edit_public_problem doesn't apply
             },
             'staff_problem_see_organization': {
                 'is_accessible_by': self.assertFalse,
@@ -210,7 +210,7 @@ class ProblemTestCase(CommonDataMixin, TestCase):
                 'is_editable_by': self.assertFalse,
             },
             'normal': {
-                'is_accessible_by': self.assertFalse,
+                'is_accessible_by': self.assertTrue,  # org admin can view org-private problems
                 'is_editable_by': self.assertFalse,
             },
             'anonymous': {

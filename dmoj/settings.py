@@ -304,7 +304,8 @@ MIDDLEWARE = (
     'django.contrib.redirects.middleware.RedirectFallbackMiddleware',
 )
 
-IMPERSONATE_REQUIRE_SUPERUSER = True
+IMPERSONATE_CUSTOM_ALLOW = 'judge.impersonation.can_impersonate'
+IMPERSONATE_CUSTOM_USER_QUERYSET = 'judge.impersonation.get_impersonable_users'
 IMPERSONATE_DISABLE_LOGGING = True
 
 ACCOUNT_ACTIVATION_DAYS = 7

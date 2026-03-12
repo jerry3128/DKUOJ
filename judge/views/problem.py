@@ -37,6 +37,7 @@ from judge.models import (
     ContestSubmission,
     Judge,
     Language,
+    Organization,
     Problem,
     ProblemData,
     ProblemGroup,
@@ -571,13 +572,22 @@ class ProblemList(QueryStringSortMixin, TitleMixin, SolvedProblemMixin, ListView
 
     def get_normal_queryset(self):
         filter = Q(is_public=True)
-        if not self.request.user.has_perm('see_organization_problem'):
+        if not self.request.user.has_perm('judge.see_organization_problem'):
             org_filter = Q(is_organization_private=False)
             if self.profile is not None:
-                org_filter |= Q(organizations__in=self.profile.organizations.all())
+                # If classes are set, check class membership; otherwise check org membership
+                org_filter |= Q(is_organization_private=True, classes__isnull=True,
+                                organizations__in=self.profile.organizations.all())
+                org_filter |= Q(is_organization_private=True,
+                                classes__in=self.profile.classes.all())
             filter &= org_filter
         if self.profile is not None:
             filter = Problem.q_add_author_curator_tester(filter, self.profile)
+            # Org admins can see all org-private problems
+            if self.request.user.has_perm('judge.edit_own_problem'):
+                filter |= Problem.organization_filter_q(
+                    Organization.admins.through.objects.filter(profile=self.profile).values('organization_id'),
+                )
         queryset = Problem.objects.filter(filter).select_related('group').defer('description', 'summary')
         if self.profile is not None and self.hide_solved:
             queryset = queryset.exclude(
@@ -992,6 +1002,14 @@ class ProblemClone(ProblemMixin, PermissionRequiredMixin, TitleMixin, SingleObje
     template_name = 'problem/clone.html'
     form_class = ProblemCloneForm
     permission_required = 'judge.clone_problem'
+
+    def has_permission(self):
+        if super().has_permission():
+            return True
+        if not self.request.user.is_authenticated:
+            return False
+        problem = self.get_object()
+        return problem.is_viewable_by_org_admin(self.request.user)
 
     def form_valid(self, form):
         problem = self.object

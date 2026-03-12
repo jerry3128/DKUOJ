@@ -54,7 +54,15 @@ class OrganizationSelect2View(Select2View):
 
 class ClassSelect2View(Select2View):
     def get_queryset(self):
-        return Class.get_visible_classes(self.request.user).filter(name__icontains=self.term)
+        queryset = Class.get_visible_classes(self.request.user).filter(name__icontains=self.term)
+        # Filter by organization if provided
+        org_ids = self.request.GET.get('organizations', '')
+        if not org_ids:
+            return queryset.none()
+        org_id_list = [int(x) for x in org_ids.split(',') if x.isdigit()]
+        if not org_id_list:
+            return queryset.none()
+        return queryset.filter(organization_id__in=org_id_list)
 
 
 class ProblemSelect2View(Select2View):

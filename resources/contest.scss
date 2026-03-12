@@ -188,10 +188,16 @@ form.contest-join-pseudotab {
 }
 
 #ranking-table {
+    thead th {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+    }
+
     .user-name {
         min-width: 20em;
         position: sticky;
-        background: #fff;
+        background: transparent;
         left: 0;
     }
 

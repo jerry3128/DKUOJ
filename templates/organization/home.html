@@ -59,6 +59,7 @@
     {% if can_edit %}
         <div><a href="{{ url('edit_organization', organization.id, organization.slug) }}">{{ _('Edit organization') }}</a></div>
         <div><a href="{{ url('organization_import_users', organization.id, organization.slug) }}">{{ _('Import Users') }}</a></div>
+        <div><a href="{{ url('organization_create_class', organization.id, organization.slug) }}">{{ _('Create Class') }}</a></div>
     {% endif %}
 
     {% if can_review_requests %}

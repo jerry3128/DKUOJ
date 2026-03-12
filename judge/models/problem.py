@@ -15,7 +15,7 @@ from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 
 from judge.fulltext import SearchQuerySet
-from judge.models.profile import Organization, Profile
+from judge.models.profile import Class, Organization, Profile
 from judge.models.runtime import Language
 from judge.user_translations import gettext as user_gettext
 
@@ -181,6 +181,8 @@ class Problem(models.Model):
 
     organizations = models.ManyToManyField(Organization, blank=True, verbose_name=_('organizations'),
                                            help_text=_('If private, only these organizations may see the problem.'))
+    classes = models.ManyToManyField(Class, blank=True, verbose_name=_('classes'),
+                                     help_text=_('If organization private, only these classes may see the problem.'))
     is_organization_private = models.BooleanField(verbose_name=_('private to organizations'), default=False)
 
     def __init__(self, *args, **kwargs):
@@ -208,9 +210,15 @@ class Problem(models.Model):
             return True
         if user.profile.id in self.editor_ids:
             return True
-        if self.is_organization_private and self.organizations.filter(admins=user.profile).exists():
-            return True
         return False
+
+    def is_viewable_by_org_admin(self, user):
+        """Check if user is org admin of any organization this problem belongs to."""
+        if not user.is_authenticated:
+            return False
+        if not self.is_organization_private:
+            return False
+        return self.organizations.filter(admins=user.profile).exists()
 
     def is_accessible_by(self, user, skip_contest_problem_check=False):
         # If we don't want to check if the user is in a contest containing that problem.
@@ -232,10 +240,17 @@ class Problem(models.Model):
             if user.has_perm('judge.see_organization_problem'):
                 return True
 
-            # If the user is in the organization.
-            if user.is_authenticated and \
-                    self.organizations.filter(id__in=user.profile.organizations.all()):
+            # If user is org admin
+            if self.is_viewable_by_org_admin(user):
                 return True
+
+            # If classes are specified, check class membership; otherwise check org membership
+            if user.is_authenticated:
+                if self.classes.exists():
+                    if self.classes.filter(id__in=user.profile.classes.all()).exists():
+                        return True
+                elif self.organizations.filter(id__in=user.profile.organizations.all()).exists():
+                    return True
 
         if not user.is_authenticated:
             return False
@@ -251,6 +266,10 @@ class Problem(models.Model):
 
         # If user is a tester.
         if self.testers.filter(id=user.profile.id).exists():
+            return True
+
+        # Check if user is org admin for non-public org-private problems
+        if self.is_viewable_by_org_admin(user):
             return True
 
         return False
@@ -288,11 +307,11 @@ class Problem(models.Model):
                     Profile.organizations.through.objects.filter(profile=user.profile).values('organization_id'),
                 )
 
-            if edit_own_problem:
-                q |= cls.organization_filter_q(
-                    # Avoids needlessly joining Organization
-                    Organization.admins.through.objects.filter(profile=user.profile).values('organization_id'),
-                )
+            # Org admins can view org-private problems in their organizations
+            q |= cls.organization_filter_q(
+                # Avoids needlessly joining Organization
+                Organization.admins.through.objects.filter(profile=user.profile).values('organization_id'),
+            )
 
             # Authors, curators, and testers should always have access.
             q = cls.q_add_author_curator_tester(q, user.profile)
@@ -327,7 +346,6 @@ class Problem(models.Model):
             return cls.objects.all()
 
         q = Q(authors=user.profile) | Q(curators=user.profile)
-        q |= Q(is_organization_private=True, organizations__in=user.profile.admin_of.all())
 
         if user.has_perm('judge.edit_public_problem'):
             q |= Q(is_public=True)

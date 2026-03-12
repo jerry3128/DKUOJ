@@ -374,6 +374,10 @@ class Contest(models.Model):
         if user.profile.id in self.spectator_ids:
             return
 
+        # Org admins can always see org-private contests
+        if self.is_viewable_by_org_admin(user):
+            return
+
         # Contest is not publicly visible
         if not self.is_visible:
             raise self.Inaccessible()
@@ -385,22 +389,32 @@ class Contest(models.Model):
         if self.view_contest_scoreboard.filter(id=user.profile.id).exists():
             return
 
-        in_org = (self.organizations.filter(id__in=user.profile.organizations.all()).exists() or
-                  self.classes.filter(id__in=user.profile.classes.all()).exists())
-        in_users = self.private_contestants.filter(id=user.profile.id).exists()
-
-        if not self.is_private and self.is_organization_private:
-            if in_org:
-                return
-            raise self.PrivateContest()
+        # Check organization/class membership for students
+        if self.is_organization_private:
+            # If classes are specified, check class membership
+            if self.classes.exists():
+                in_class = self.classes.filter(id__in=user.profile.classes.all()).exists()
+                if not self.is_private and in_class:
+                    return
+                if self.is_private:
+                    in_users = self.private_contestants.filter(id=user.profile.id).exists()
+                    if in_class and in_users:
+                        return
+                raise self.PrivateContest()
+            else:
+                # No classes specified - check org membership
+                in_org = self.organizations.filter(id__in=user.profile.organizations.all()).exists()
+                if not self.is_private and in_org:
+                    return
+                if self.is_private:
+                    in_users = self.private_contestants.filter(id=user.profile.id).exists()
+                    if in_org and in_users:
+                        return
+                raise self.PrivateContest()
 
         if self.is_private and not self.is_organization_private:
+            in_users = self.private_contestants.filter(id=user.profile.id).exists()
             if in_users:
-                return
-            raise self.PrivateContest()
-
-        if self.is_private and self.is_organization_private:
-            if in_org and in_users:
                 return
             raise self.PrivateContest()
 
@@ -462,6 +476,14 @@ class Contest(models.Model):
 
         return False
 
+    def is_viewable_by_org_admin(self, user):
+        """Check if user is org admin of any organization this contest belongs to."""
+        if not user.is_authenticated:
+            return False
+        if not self.is_organization_private:
+            return False
+        return self.organizations.filter(admins=user.profile).exists()
+
     @classmethod
     def get_visible_contests(cls, user):
         if not user.is_authenticated:
@@ -470,8 +492,14 @@ class Contest(models.Model):
 
         queryset = cls.objects.defer('description')
         if not (user.has_perm('judge.see_private_contest') or user.has_perm('judge.edit_all_contest')):
-            org_check = (Q(organizations__in=user.profile.organizations.all()) |
-                         Q(classes__in=user.profile.classes.all()))
+            # For org-private contests:
+            # - If classes are set, only class members can see
+            # - If no classes, org members can see
+            org_only_check = Q(is_organization_private=True, classes__isnull=True,
+                               organizations__in=user.profile.organizations.all())
+            class_check = Q(is_organization_private=True,
+                            classes__in=user.profile.classes.all())
+            org_check = org_only_check | class_check
             q = Q(is_visible=True)
             q &= (
                 Q(view_contest_scoreboard=user.profile) |
@@ -485,6 +513,8 @@ class Contest(models.Model):
             q |= Q(curators=user.profile)
             q |= Q(testers=user.profile)
             q |= Q(spectators=user.profile)
+            # Org admins can see org-private contests
+            q |= Q(is_organization_private=True, organizations__admins=user.profile)
             queryset = queryset.filter(q)
         return queryset.distinct()
 

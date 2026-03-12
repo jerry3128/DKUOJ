@@ -1,7 +1,7 @@
 # DKU OJ
 
-![](https://img.shields.io/github/actions/workflow/status/binghan1227/dmoj-web/build.yml?branch=customize)
-![](https://img.shields.io/github/license/binghan1227/dmoj-web)
+![](https://img.shields.io/github/actions/workflow/status/binghan1227/DKUOJ/build.yml?branch=customize)
+![](https://img.shields.io/github/license/binghan1227/DKUOJ)
 
 This is a customized fork of the [DMOJ: Modern Online Judge](https://dmoj.ca/), tailored with specific features for course management and enhanced user experience.
 

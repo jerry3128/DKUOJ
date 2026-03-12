@@ -1,4 +1,5 @@
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin
+from django import forms
 from django.contrib import admin
 from django.core.exceptions import PermissionDenied
 from django.db import connection, transaction
@@ -93,6 +94,21 @@ class ContestForm(ModelForm):
     def clean(self):
         cleaned_data = super(ContestForm, self).clean()
         cleaned_data['banned_users'].filter(current_contest__contest=self.instance).update(current_contest=None)
+
+        organizations = cleaned_data.get('organizations')
+        classes = cleaned_data.get('classes')
+
+        if classes and organizations:
+            org_ids = set(organizations.values_list('id', flat=True))
+            invalid_classes = classes.exclude(organization_id__in=org_ids)
+            if invalid_classes.exists():
+                raise forms.ValidationError(
+                    _('Selected classes must belong to selected organizations.'),
+                )
+        elif classes and not organizations:
+            raise forms.ValidationError(
+                _('You must select organizations before selecting classes.'),
+            )
 
     class Meta:
         widgets = {
@@ -326,6 +342,9 @@ class ContestAdmin(NoBatchDeleteMixin, SortableAdminBase, VersionAdmin):
         ).distinct()
         form.base_fields['classes'].queryset = Class.get_visible_classes(request.user)
         return form
+
+    class Media:
+        js = ('admin_class_filter.js',)
 
 
 class ContestParticipationForm(ModelForm):

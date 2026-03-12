@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block body %}
+    <div style="margin: 0 20px;">
+        <h3>{{ _('Create Class in') }} {{ organization.name }}</h3>
+
+        <form method="post" class="form-horizontal">
+            {% csrf_token %}
+            {% if form.non_field_errors() %}
+                <div class="alert alert-error">
+                    {{ form.non_field_errors() }}
+                </div>
+            {% endif %}
+
+            <div class="form-group {% if form.name.errors %}error{% endif %}" style="margin-bottom: 1em;">
+                <label for="{{ form.name.id_for_label }}" style="display:block; font-weight:bold;">{{ _('Class Name') }}</label>
+                {{ form.name }}
+                <div class="help-block" style="color: #777; font-size: 0.9em;">
+                    {{ _('e.g. CS201 2026 Sp 3, CS101 2026 Fa 1') }}
+                </div>
+                {% if form.name.errors %}
+                    <span class="help-inline" style="color: red;">{{ form.name.errors[0] }}</span>
+                {% endif %}
+            </div>
+
+            <div class="form-group {% if form.slug.errors %}error{% endif %}" style="margin-bottom: 1em;">
+                <label for="{{ form.slug.id_for_label }}" style="display:block; font-weight:bold;">{{ _('Slug') }}</label>
+                {{ form.slug }}
+                <div class="help-block" style="color: #777; font-size: 0.9em;">
+                    {{ _('URL-friendly identifier (lowercase letters, numbers, hyphens only)') }}
+                </div>
+                {% if form.slug.errors %}
+                    <span class="help-inline" style="color: red;">{{ form.slug.errors[0] }}</span>
+                {% endif %}
+            </div>
+
+            <div class="form-group {% if form.description.errors %}error{% endif %}" style="margin-bottom: 1em;">
+                <label for="{{ form.description.id_for_label }}" style="display:block; font-weight:bold;">{{ _('Description') }} ({{ _('optional') }})</label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                    <span class="help-inline" style="color: red;">{{ form.description.errors[0] }}</span>
+                {% endif %}
+            </div>
+
+            <div class="form-group {% if form.access_code.errors %}error{% endif %}" style="margin-bottom: 1em;">
+                <label for="{{ form.access_code.id_for_label }}" style="display:block; font-weight:bold;">{{ _('Access Code') }} ({{ _('optional') }})</label>
+                {{ form.access_code }}
+                <div class="help-block" style="color: #777; font-size: 0.9em;">
+                    {{ _('If set, users will need this code to join the class.') }}
+                </div>
+                {% if form.access_code.errors %}
+                    <span class="help-inline" style="color: red;">{{ form.access_code.errors[0] }}</span>
+                {% endif %}
+            </div>
+
+            <div style="margin-top: 1.5em;">
+                <button type="submit" class="button" style="display: inline-block; width: auto; margin-right: 10px;">{{ _('Create Class') }}</button>
+                <a href="{{ organization.get_absolute_url() }}" class="button" style="display: inline-block; width: auto;">{{ _('Cancel') }}</a>
+            </div>
+        </form>
+    </div>
+    <script>
+        (function () {
+            var nameField = document.getElementById('id_name');
+            var slugField = document.getElementById('id_slug');
+            var slugManuallyEdited = false;
+
+            slugField.addEventListener('input', function () {
+                slugManuallyEdited = true;
+            });
+
+            nameField.addEventListener('input', function () {
+                if (slugManuallyEdited) return;
+                var slug = nameField.value
+                    .toLowerCase()
+                    .replace(/[\s_]+/g, '-')
+                    .replace(/[^a-z0-9\-]/g, '')
+                    .replace(/-{2,}/g, '-')
+                    .replace(/^-+|-+$/g, '');
+                slugField.value = slug;
+            });
+        })();
+    </script>
+{% endblock %}

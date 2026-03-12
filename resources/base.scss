@@ -98,8 +98,6 @@ footer {
     color: $color_primary50;
     display: block;
     width: 100%;
-    position: absolute;
-    bottom: 0;
 }
 
 body {
@@ -111,7 +109,6 @@ body {
     background: $color_primary5;
     font-family: "Segoe UI", "Lucida Grande", Arial, sans-serif;
     color: $color_primary100;
-    height: 100%;
 }
 
 .unselectable {
@@ -161,7 +158,7 @@ hr {
 
     // Header
     width: 90%;
-    height: 100%;
+    flex: 1;
     min-height: 25em;
     display: block;
 
@@ -178,8 +175,6 @@ footer {
 }
 
 html {
-    position: relative;
-    height: 100%;
 }
 
 a {
@@ -274,8 +269,9 @@ noscript #noscript {
 }
 
 #page-container {
-    min-height: 100%;
-    position: relative;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
     margin: 0 auto;
     border-right: 1px solid $color_primary25;
     border-left: 1px solid $color_primary25;
@@ -287,10 +283,8 @@ noscript #noscript {
 // border-bottom-right-radius: 4px
 
 #content-body {
-    padding-bottom: 4em;
+    padding-bottom: 1em;
 }
-
-// Offset the footer
 
 .title-line-action {
     float: right;

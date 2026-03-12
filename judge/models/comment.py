@@ -19,8 +19,8 @@ from judge.utils.cachedict import CacheDict
 
 __all__ = ['Comment', 'CommentLock', 'CommentVote']
 
-comment_validator = RegexValidator(r'^[pcs]:[a-z0-9]+$|^b:\d+$',
-                                   _(r'Page code must be ^[pcs]:[a-z0-9]+$|^b:\d+$'))
+comment_validator = RegexValidator(r'^[pcs]:[a-z0-9]+$|^b:\d+$|^sub:\d+$',
+                                   _(r'Page code must be ^[pcs]:[a-z0-9]+$|^b:\d+$|^sub:\d+$'))
 
 
 class Comment(MPTTModel):
@@ -47,15 +47,19 @@ class Comment(MPTTModel):
         queryset = cls.objects.filter(hidden=False).select_related('author__user') \
             .defer('author__about', 'body').order_by('-id')
 
+        from judge.models.submission import Submission
+
         problem_cache = CacheDict(lambda code: Problem.objects.defer('description', 'summary').get(code=code))
         solution_cache = CacheDict(lambda code: Solution.objects.defer('content').get(problem__code=code))
         contest_cache = CacheDict(lambda key: Contest.objects.defer('description').get(key=key))
         blog_cache = CacheDict(lambda id: BlogPost.objects.defer('summary', 'content').get(id=id))
+        submission_cache = CacheDict(lambda id: Submission.objects.get(id=id))
 
         problem_access = CacheDict(lambda code: problem_cache[code].is_accessible_by(user))
         solution_access = CacheDict(lambda code: problem_access[code] and solution_cache[code].is_accessible_by(user))
         contest_access = CacheDict(lambda key: contest_cache[key].is_accessible_by(user))
         blog_access = CacheDict(lambda id: blog_cache[id].can_see(user))
+        submission_access = CacheDict(lambda id: submission_cache[id].can_see_detail(user))
 
         if batch is None:
             batch = 2 * n
@@ -65,22 +69,27 @@ class Comment(MPTTModel):
             if not slice:
                 break
             for comment in slice:
-                page_key = comment.page[2:]
                 try:
-                    if comment.page.startswith('p:'):
-                        has_access = problem_access[page_key]
-                        comment.page_title = problem_cache[page_key].name
-                    elif comment.page.startswith('s:'):
-                        has_access = solution_access[page_key]
-                        comment.page_title = _('Editorial for %s') % problem_cache[page_key].name
-                    elif comment.page.startswith('c:'):
-                        has_access = contest_access[page_key]
-                        comment.page_title = contest_cache[page_key].name
-                    elif comment.page.startswith('b:'):
-                        has_access = blog_access[page_key]
-                        comment.page_title = blog_cache[page_key].title
+                    if comment.page.startswith('sub:'):
+                        sub_key = comment.page[4:]
+                        has_access = submission_access[sub_key]
+                        comment.page_title = _('Submission #%s') % sub_key
                     else:
-                        has_access = True
+                        page_key = comment.page[2:]
+                        if comment.page.startswith('p:'):
+                            has_access = problem_access[page_key]
+                            comment.page_title = problem_cache[page_key].name
+                        elif comment.page.startswith('s:'):
+                            has_access = solution_access[page_key]
+                            comment.page_title = _('Editorial for %s') % problem_cache[page_key].name
+                        elif comment.page.startswith('c:'):
+                            has_access = contest_access[page_key]
+                            comment.page_title = contest_cache[page_key].name
+                        elif comment.page.startswith('b:'):
+                            has_access = blog_access[page_key]
+                            comment.page_title = blog_cache[page_key].title
+                        else:
+                            has_access = True
                 except ObjectDoesNotExist:
                     pass
                 else:
@@ -110,6 +119,8 @@ class Comment(MPTTModel):
                 link = reverse('blog_post', args=(self.page[2:], slug))
             elif self.page.startswith('s:'):
                 link = reverse('problem_editorial', args=(self.page[2:],))
+            elif self.page.startswith('sub:'):
+                link = reverse('submission_status', args=(self.page[4:],))
         except Exception:
             link = 'invalid'
         return link
@@ -125,6 +136,8 @@ class Comment(MPTTModel):
                 return BlogPost.objects.values_list('title', flat=True).get(id=page[2:])
             elif page.startswith('s:'):
                 return _('Editorial for %s') % Problem.objects.values_list('name', flat=True).get(code=page[2:])
+            elif page.startswith('sub:'):
+                return _('Submission #%s') % page[4:]
             return '<unknown>'
         except ObjectDoesNotExist:
             return '<deleted>'
@@ -143,6 +156,9 @@ class Comment(MPTTModel):
                 return Contest.objects.get(key=self.page[2:]).is_accessible_by(user)
             elif self.page.startswith('b:'):
                 return BlogPost.objects.get(id=self.page[2:]).can_see(user)
+            elif self.page.startswith('sub:'):
+                from judge.models.submission import Submission
+                return Submission.objects.get(id=self.page[4:]).can_see_detail(user)
             else:
                 return True
         except ObjectDoesNotExist:

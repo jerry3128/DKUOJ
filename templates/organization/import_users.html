@@ -23,6 +23,17 @@
                 {% endif %}
             </div>
 
+            <div class="form-group {% if form.target_class.errors %}error{% endif %}" style="margin-bottom: 1em;">
+                <label for="{{ form.target_class.id_for_label }}" style="display:block; font-weight:bold;">{{ form.target_class.label }}</label>
+                {{ form.target_class }}
+                <div class="help-block" style="color: #777; font-size: 0.9em;">
+                    {{ _('Optionally add users to a specific class within this organization.') }}
+                </div>
+                {% if form.target_class.errors %}
+                    <span class="help-inline" style="color: red;">{{ form.target_class.errors[0] }}</span>
+                {% endif %}
+            </div>
+
             <div class="form-group" style="margin-bottom: 0.5em;">
                 <label class="checkbox">
                     {{ form.update_existing }}
@@ -54,6 +65,7 @@
                 <li><i class="fa fa-pencil"></i> {{ _('Updated:') }} <strong>{{ result.updated }}</strong></li>
                 <li><i class="fa fa-minus-circle"></i> {{ _('Skipped:') }} <strong>{{ result.skipped }}</strong></li>
                 <li><i class="fa fa-link"></i> {{ _('Organization Linked:') }} <strong>{{ result.org_linked }}</strong></li>
+                <li><i class="fa fa-users"></i> {{ _('Class Linked:') }} <strong>{{ result.class_linked }}</strong></li>
             </ul>
             {% if result.errors %}
                 <div class="alert alert-error">

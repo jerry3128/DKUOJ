@@ -9,7 +9,8 @@ from django.db import transaction
 from django.db.utils import IntegrityError
 from django.utils.translation import gettext as _
 
-from judge.models import Contest, ContestParticipation, ContestSubmission, Organization, Profile, SubmissionSource
+from judge.models import (
+    Class, Contest, ContestParticipation, ContestSubmission, Organization, Profile, SubmissionSource)
 
 
 class UserImportResult:
@@ -19,9 +20,10 @@ class UserImportResult:
         self.skipped = 0
         self.errors = []
         self.org_linked = 0
+        self.class_linked = 0
 
 
-def process_user_csv(csv_file, organization: Organization = None,
+def process_user_csv(csv_file, organization: Organization = None, target_class: Class = None,
                      update_existing: bool = False, activate: bool = True) -> UserImportResult:
     """
     Parses a CSV file object and imports users.
@@ -67,6 +69,10 @@ def process_user_csv(csv_file, organization: Organization = None,
                 if organization and user:
                     if _add_user_to_org(user, organization):
                         result.org_linked += 1
+
+                if target_class and user:
+                    if _add_user_to_class(user, target_class):
+                        result.class_linked += 1
 
         except Exception as exc:
             result.errors.append(_('Row %(row)d (%(username)s): %(error)s') % {
@@ -135,6 +141,14 @@ def _add_user_to_org(user: User, org: Organization) -> bool:
     if org.members.filter(id=profile.id).exists():
         return False
     org.members.add(profile)
+    return True
+
+
+def _add_user_to_class(user: User, target_class: Class) -> bool:
+    profile = _ensure_profile(user)
+    if target_class.members.filter(id=profile.id).exists():
+        return False
+    target_class.members.add(profile)
     return True
 
 

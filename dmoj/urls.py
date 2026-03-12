@@ -242,6 +242,7 @@ urlpatterns = [
         path('/edit', organization.EditOrganization.as_view(), name='edit_organization'),
         path('/kick', organization.KickUserWidgetView.as_view(), name='organization_user_kick'),
         path('/import/users', organization.OrganizationImportUsers.as_view(), name='organization_import_users'),
+        path('/class/create', organization.CreateClass.as_view(), name='organization_create_class'),
 
         path('/request', organization.RequestJoinOrganization.as_view(), name='request_organization'),
         path('/request/<int:rpk>', organization.OrganizationRequestDetail.as_view(),

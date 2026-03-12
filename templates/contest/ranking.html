@@ -114,6 +114,25 @@
             }
         });
     </script>
+    <script type="text/javascript">
+        $(function () {
+            var container = $('#ranking-table').closest('.h-scrollable-table');
+            if (container.length) {
+                container.css('overflow-y', 'auto');
+
+                function setHeight() {
+                    var top = container[0].getBoundingClientRect().top;
+                    var maxHeight = window.innerHeight - top - 65;
+                    if (maxHeight > 100) {
+                        container.css('max-height', maxHeight + 'px');
+                    }
+                }
+
+                setHeight();
+                $(window).on('resize', setHeight);
+            }
+        });
+    </script>
     {% include "contest/media-js.html" %}
 {% endblock %}
 

@@ -31,3 +31,4 @@ exclude =
     ./dmoj/local_settings.py,
     # is actually a fragment to be included by settings.py
     ./.ci.settings.py,
+    ./judge/management/commands/migrate_organizations.py

@@ -389,6 +389,13 @@
                         </a>
                     </span>
                 {% endfor %}
+                {% for class in problem.classes.all() %}
+                    <span class="class-tag">
+                        <a href="{{ class.get_absolute_url() }}">
+                            <i class="fa fa-users"></i> {{ class.name }}
+                        </a>
+                    </span>
+                {% endfor %}
             </span>
         {% endif %}
         {% if has_pdf_render %}
