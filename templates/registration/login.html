@@ -23,6 +23,10 @@
         .github-icon i {
             color: black;
         }
+
+        .duke-icon i {
+            color: #012169;
+        }
     </style>
 {% endblock %}
 
@@ -54,29 +58,29 @@
             <input type="hidden" name="next" value="{{ next }}">
         </form>
 
-        {% if form.has_google_auth or form.has_facebook_auth or form.has_github_auth %}
-            <h4>{{ _('Or log in with...') }}</h4>
-            <div>
-                {% if form.has_google_auth %}
-                    <a href="{{ url('social:begin', "google-oauth2") }}?next={{ next }}" class="social google-icon">
-                        <i class="fa fa-google-plus-square"></i>
-                    </a>
-                {% endif %}
-                {% if form.has_facebook_auth %}
-                    <a href="{{ url('social:begin', "facebook") }}?next={{ next }}" class="social facebook-icon">
-                        <i class="fa fa-facebook-square"></i>
-                    </a>
-                {% endif %}
-                {% if form.has_github_auth %}
-                    <a href="{{ url('social:begin', "github-secure") }}?next={{ next }}" class="social github-icon">
-                        <i class="fa fa-github-square"></i>
-                    </a>
-                {% endif %}
-            </div>
-        {% endif %}
+        <h4>{{ _('Or log in with...') }}</h4><br>
+        <div>
+            <a href="https://dkuoj-auth.colab.duke.edu/auth/redirect" class="social duke-icon" style="font-size: 16px !important;">
+                <i class="fa fa-university"></i> Duke NetID
+            </a>
+            <!--
+            {% if form.has_google_auth %}
+                <a href="{{ url('social:begin', "google-oauth2") }}?next={{ next }}" class="social google-icon">
+                    <i class="fa fa-google-plus-square"></i>
+                </a>
+            {% endif %}
+            {% if form.has_facebook_auth %}
+                <a href="{{ url('social:begin', "facebook") }}?next={{ next }}" class="social facebook-icon">
+                    <i class="fa fa-facebook-square"></i>
+                </a>
+            {% endif %}
+            {% if form.has_github_auth %}
+                <a href="{{ url('social:begin', "github-secure") }}?next={{ next }}" class="social github-icon">
+                    <i class="fa fa-github-square"></i>
+                </a>
+            {% endif %}
+            -->
+        </div>
     </div>
-	<div>
-        Username should be your NetID. Please contact the administrator if you have forgotten your password.
-	</div>
 {% endblock %}
 

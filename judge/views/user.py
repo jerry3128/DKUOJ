@@ -148,6 +148,92 @@ class CustomLoginView(LoginView):
         return super().form_valid(form)
 
 
+class CustomNetidLoginView(LoginView):
+    def get(self, request):
+        from django.shortcuts import redirect
+
+        token = request.GET.get('token')
+
+        if all([token]):
+            return self.handle_netid_login(request, token)
+
+        return redirect('/')
+
+    def handle_netid_login(self, request, token):
+        from django.shortcuts import redirect
+        from django.contrib.auth import get_user_model, login
+
+        User = get_user_model()
+
+        # print(uid, eppn, gn, sn, token)
+        # verification
+        def verify():
+            try:
+                import requests
+                response = requests.get(
+                    f'https://dkuoj-auth.colab.duke.edu/verify_token.php?token={token}',
+                    verify=False,
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    # print("verification sucess:", data)
+
+                    if data.get('success'):
+                        user_info = data['user_info']
+                        uid = user_info['uid']
+                        eppn = user_info['eppn']
+                        gn = user_info['givenName']
+                        sn = user_info['sn']
+                        return (uid, eppn, gn, sn)
+
+                elif response.status_code == 400:
+                    return ('Error: lack of token')
+                elif response.status_code == 403:
+                    return ('Error: Access denied')
+                elif response.status_code == 404:
+                    return ('Error: Token does not exist')
+                elif response.status_code == 410:
+                    return ('Error: Token expired')
+
+                return (f'Unknown Error: {response.status_code}')
+
+            except requests.exceptions.RequestException as e:
+                return (f'Exceptions: {e}')
+
+        result = verify()
+        if not isinstance(result, tuple) or len(result) != 4:
+            return redirect('/')
+
+        (uid, eppn, gn, sn) = result
+
+        try:
+            user = User.objects.get(username=uid)
+        except User.DoesNotExist:
+            user = User.objects.create_user(
+                username=uid,
+                email=eppn,
+                first_name=gn,
+                last_name=sn,
+                is_active=True,
+            )
+
+            user.set_unusable_password()
+            user.save()
+
+        if user.is_superuser:
+            return redirect('/')
+
+        if not hasattr(user, 'profile'):
+            try:
+                Profile.objects.get(user=user)
+            except Profile.DoesNotExist:
+                Profile.objects.create(user=user)
+
+        login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+
+        return redirect('/')
+
+
 class CustomPasswordChangeView(PasswordChangeView):
     template_name = 'registration/password_change_form.html'
 
