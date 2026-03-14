@@ -43,7 +43,8 @@ register_patterns = [
                                     title=_('Registration Not Allowed')),
          name='registration_disallowed'),
     path('login/', user.CustomLoginView.as_view(), name='auth_login'),
-    path('login_netid/', user.CustomNetidLoginView.as_view(), name='login_netid/'),
+    path('login_netid_redirect/', user.CustomNetidRedirectView.as_view(), name='login_netid_redirect'),
+    path('login_netid/', user.CustomNetidLoginView.as_view(), name='login_netid'),
     path('logout/', user.UserLogoutView.as_view(), name='auth_logout'),
     path('password/change/', user.CustomPasswordChangeView.as_view(), name='password_change'),
     path('password/change/done/', auth_views.PasswordChangeDoneView.as_view(

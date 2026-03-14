@@ -148,6 +148,14 @@ class CustomLoginView(LoginView):
         return super().form_valid(form)
 
 
+class CustomNetidRedirectView(LoginView):
+    def get(self, request):
+        from django.shortcuts import redirect
+        from django.conf import settings
+        auth_host = settings.AUTH_HOSTS['Duke-netid']
+        return redirect(f'{auth_host}/auth/redirect')
+
+
 class CustomNetidLoginView(LoginView):
     def get(self, request):
         from django.shortcuts import redirect
@@ -170,8 +178,10 @@ class CustomNetidLoginView(LoginView):
         def verify():
             try:
                 import requests
+                from django.conf import settings
+                auth_host = settings.AUTH_HOSTS['Duke-netid']
                 response = requests.get(
-                    f'https://dkuoj-auth.colab.duke.edu/verify_token.php?token={token}',
+                    f'{auth_host}/verify_token.php?token={token}',
                     verify=False,
                 )
                 if response.status_code == 200:
