@@ -175,6 +175,11 @@ class Problem(models.Model):
 
     view_test_cases = models.BooleanField(verbose_name=_('allow downloading failed test case'), default=False)
     view_tester = models.BooleanField(verbose_name=_('allow downloading tester file'), default=False)
+    ai_hints_enabled = models.BooleanField(
+        verbose_name=_('enable AI hints'),
+        default=False,
+        help_text=_('Allow students to request AI-powered debugging hints on this problem.'),
+    )
 
     objects = TranslatedProblemQuerySet.as_manager()
     tickets = GenericRelation('Ticket')

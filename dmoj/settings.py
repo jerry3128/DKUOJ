@@ -603,6 +603,13 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 
 WEBAUTHN_RP_ID = None
 
+# Azure OpenAI for AI hints
+AZURE_OPENAI_ENDPOINT = None       # e.g. 'https://myinstance.openai.azure.com/'
+AZURE_OPENAI_API_KEY = None
+AZURE_OPENAI_API_VERSION = '2024-02-01'
+AZURE_OPENAI_DEPLOYMENT = None     # deployment/model name, e.g. 'gpt-4o'
+DMOJ_AI_HINT_DAILY_LIMIT = 5      # max AI hint requests per user per day
+
 try:
     with open(os.path.join(os.path.dirname(__file__), 'local_settings.py')) as f:
         exec(f.read(), globals())

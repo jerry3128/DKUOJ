@@ -157,6 +157,7 @@ urlpatterns = [
         path('', submission.SubmissionStatus.as_view(), name='submission_status'),
         path('/abort', submission.abort_submission, name='submission_abort'),
         path('/test_case/<int:case>/<str:type>', download_test_case, name='submission_test_case_download'),
+        path('/ai-hint', submission.SubmissionAIHint.as_view(), name='submission_ai_hint'),
     ])),
 
     path('users/', include([

@@ -44,3 +44,6 @@ importlib-metadata<5
 # This is the requirements for Binghan-customization
 markdown
 markdown-katex
+
+# This is for the AI hint function
+openai

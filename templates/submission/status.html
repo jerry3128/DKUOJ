@@ -106,6 +106,61 @@
     <hr class="half-hr">
     <br>
 
+    {% if ai_hints_enabled %}
+    <div class="ai-hint-section" style="margin: 1em 0;">
+        <button id="ai-hint-btn" class="btn btn-info"
+                {% if ai_hints_remaining == 0 %}disabled{% endif %}>
+            {{ _('Get AI Hint') }}
+            <span id="ai-hint-quota">
+                ({{ ai_hints_remaining }} {{ _('use') }}{{ 's' if ai_hints_remaining != 1 else '' }} {{ _('remaining today') }})
+            </span>
+        </button>
+        <div id="ai-hint-result" style="display:none; margin-top: 0.75em; padding: 0.75em;
+             background: #f0f8ff; border-left: 4px solid #4a90d9; white-space: pre-wrap;"></div>
+    </div>
+    <script>
+    document.getElementById('ai-hint-btn').addEventListener('click', function() {
+        var btn = this;
+        btn.disabled = true;
+        btn.childNodes[0].nodeValue = '{{ _('Loading\u2026') }} ';
+        fetch('{{ url('submission_ai_hint', submission.id) }}', {
+            method: 'POST',
+            headers: {'X-CSRFToken': '{{ csrf_token }}'},
+        })
+        .then(r => {
+            if (!r.ok) {
+                return r.json().then(data => {
+                    throw new Error(data.error || '{{ _('Server error') }} (' + r.status + ')');
+                });
+            }
+            return r.json();
+        })
+        .then(data => {
+            var box = document.getElementById('ai-hint-result');
+            if (data.hint) {
+                box.textContent = data.hint;
+                box.style.display = 'block';
+                document.getElementById('ai-hint-quota').textContent =
+                    '(' + data.remaining + ' use' + (data.remaining === 1 ? '' : 's') + ' remaining today)';
+                btn.childNodes[0].nodeValue = '{{ _('Get AI Hint') }} ';
+                btn.disabled = data.remaining === 0;
+            } else {
+                box.textContent = '{{ _('Error') }}: ' + (data.error || '{{ _('Empty response from AI. Please try again.') }}');
+                box.style.display = 'block';
+                btn.childNodes[0].nodeValue = '{{ _('Get AI Hint') }} ';
+                btn.disabled = false;
+            }
+        })
+        .catch(e => {
+            document.getElementById('ai-hint-result').textContent = '{{ _('Error') }}: ' + (e.message || '{{ _('Request failed. Please try again.') }}');
+            document.getElementById('ai-hint-result').style.display = 'block';
+            btn.childNodes[0].nodeValue = '{{ _('Get AI Hint') }} ';
+            btn.disabled = false;
+        });
+    });
+    </script>
+    {% endif %}
+
     <div id="test-cases">{% include "submission/status-testcases.html" %}</div>
 
     {% if not submission.is_graded %}

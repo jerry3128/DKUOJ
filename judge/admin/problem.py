@@ -150,7 +150,7 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
             'fields': (
                 'code', 'name', 'is_public', 'is_manually_managed', 'date', 'authors', 'curators', 'testers',
                 'organizations', 'classes', 'submission_source_visibility_mode', 'is_full_markup',
-                'view_test_cases', 'view_tester',
+                'view_test_cases', 'view_tester', 'ai_hints_enabled',
                 'description', 'license',
             ),
         }),

@@ -19,7 +19,7 @@ from django.utils.translation import gettext as _, gettext_lazy
 from django.views.decorators.http import require_POST
 from django.views.generic import DetailView, ListView
 
-from judge import event_poster as event
+from judge import ai_hints, event_poster as event
 from judge.comments import SubmissionCommentMixin
 from judge.highlight_code import highlight_code
 from judge.models import Contest, Language, Problem, ProblemTranslation, Profile, Submission
@@ -195,6 +195,17 @@ class SubmissionStatus(SubmissionCommentMixin, SubmissionDetailBase):
         if first_failed:
             context['first_failed_case_id'] = first_failed.case
 
+        # AI hints context
+        context['ai_hints_enabled'] = (
+            submission.problem.ai_hints_enabled
+            and ai_hints.is_configured()
+            and submission.status == 'D'
+            and submission.result != 'AC'
+        )
+        if context['ai_hints_enabled'] and self.request.user.is_authenticated:
+            context['ai_hints_remaining'] = ai_hints.get_remaining(self.request.profile.id)
+        else:
+            context['ai_hints_remaining'] = 0
         context['enable_comments'] = settings.DMOJ_ENABLE_COMMENTS
         if settings.DMOJ_ENABLE_COMMENTS:
             context.update(self.get_comment_context())
@@ -224,6 +235,37 @@ class SubmissionTestCaseQuery(SubmissionStatus):
             return HttpResponseBadRequest()
         self.kwargs[self.pk_url_kwarg] = kwargs[self.pk_url_kwarg] = int(request.GET['id'])
         return super(SubmissionTestCaseQuery, self).get(request, *args, **kwargs)
+
+
+class SubmissionAIHint(LoginRequiredMixin, SubmissionMixin, DetailView):
+    """POST /submission/<id>/ai-hint — returns JSON AI hint."""
+
+    def post(self, request, *args, **kwargs):
+        submission = self.get_object()
+
+        # Gate 1: feature enabled on this problem
+        if not submission.problem.ai_hints_enabled:
+            return JsonResponse({'error': 'AI hints are not enabled for this problem.'}, status=403)
+
+        # Gate 2: backend configured
+        if not ai_hints.is_configured():
+            return JsonResponse({'error': 'AI hints are not configured on this server.'}, status=503)
+
+        # Gate 3: submission belongs to this user (or staff can bypass)
+        if submission.user_id != request.profile.id and not request.user.has_perm('judge.change_submission'):
+            return JsonResponse({'error': 'You may only get hints for your own submissions.'}, status=403)
+
+        # Gate 4: quota
+        remaining = ai_hints.get_remaining(request.profile.id)
+        if remaining <= 0:
+            return JsonResponse({'error': 'You have used all your AI hints for today. Try again tomorrow.'}, status=429)
+
+        try:
+            hint = ai_hints.get_hint(submission)
+        except Exception as e:
+            return JsonResponse({'error': f'AI hint unavailable: {e}'}, status=503)
+
+        return JsonResponse({'hint': hint, 'remaining': ai_hints.get_remaining(request.profile.id)})
 
 
 class SubmissionSourceRaw(SubmissionSource):
