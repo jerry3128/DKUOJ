@@ -22,21 +22,287 @@
             padding-left: 0;
             text-align: center;
         }
+        
+        /* 状态提示样式 */
+        .status-available {
+            color: #4CAF50;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        .status-unavailable {
+            color: #f44336;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        .status-checking {
+            color: #ff9800;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        input.valid {
+            border-color: #4CAF50 !important;
+            background-color: #f0fff0 !important;
+        }
+        
+        input.invalid {
+            border-color: #f44336 !important;
+            background-color: #fff0f0 !important;
+        }
+        
+        input.checking {
+            border-color: #ff9800 !important;
+            background-color: #fff8e1 !important;
+        }
+        
+        .suggestion-hint {
+            font-size: 11px;
+            color: #666;
+            margin-top: 5px;
+            text-align: right;
+        }
+        
+        .reset-suggestion {
+            cursor: pointer;
+            color: #2196F3;
+            font-size: 11px;
+            margin-left: 10px;
+            text-decoration: underline;
+        }
+        
+        .reset-suggestion:hover {
+            color: #0b7dda;
+        }
     </style>
 {% endblock %}
 
 {% block body %}
     <form id="problem-clone-panel" action="" method="post" class="form-area">
         {% csrf_token %}
+        
+        <div id="form-errors" style="display: none;" class="errorlist"></div>
         {% if form.errors %}
-            <div id="form-errors">
+            <div id="form-errors-old">
                 {{ form.code.errors }}
             </div>
         {% endif %}
 
         <div><label class="inline-header grayed">{{ _('Enter a new code for the cloned problem:') }}</label></div>
-        <div id="problem-code-container"><span class="fullwidth">{{ form.code }}</span></div>
+        <div id="problem-code-container">
+            <span class="fullwidth">{{ form.code }}</span>
+            <div id="code-status"></div>
+            <div class="suggestion-hint">
+                💡 {{ _('Auto-generated code (you can modify it)') }}
+                <span id="reset-suggestion" class="reset-suggestion" style="display: none;">
+                    ↺ {{ _('Reset to suggested') }}
+                </span>
+            </div>
+        </div>
         <hr>
-        <button style="float:right;" type="submit">{{ _('Clone!') }}</button>
+        <button style="float:right;" type="submit" id="submit-btn">{{ _('Clone!') }}</button>
     </form>
+
+    <script>
+        const codeInput = document.getElementById('id_code');
+        const statusDiv = document.getElementById('code-status');
+        const submitBtn = document.getElementById('submit-btn');
+        const formErrors = document.getElementById('form-errors');
+        const resetSuggestionSpan = document.getElementById('reset-suggestion');
+
+        let checkTimeout = null;
+        let currentSuggestedCode = '';
+        let userModified = false;
+
+        async function checkProblemCode(code) {
+            if (!code || code.trim() === '') {
+                return null;
+            }
+
+            try {
+                const response = await fetch(`/problem/${encodeURIComponent(code)}`, {
+                    method: 'GET',
+                    cache: 'no-cache'
+                });
+
+                if (response.status === 200) return true;
+                if (response.status === 404) return false;
+                return null;
+            } catch (error) {
+                console.error('检查失败:', error);
+                return null;
+            }
+        }
+
+        // 只保留这一个：从 00000 开始递增
+        async function generateUniqueCloneCode() {
+            const max = 100000;
+
+            for (let i = 0; i < max; i++) {
+                const code = `clone${i.toString().padStart(5, '0')}`;
+                const exists = await checkProblemCode(code);
+
+                if (exists === false || exists === null) {
+                    return code;
+                }
+            }
+
+            const timestamp = Date.now().toString().slice(-5);
+            return `clone${timestamp}`;
+        }
+
+        function updateStatus(exists, isChecking = false, customMessage = null) {
+            if (customMessage) {
+                statusDiv.innerHTML = customMessage;
+                statusDiv.className = '';
+                return;
+            }
+
+            if (isChecking) {
+                statusDiv.innerHTML = '⏳ {{ _("Checking availability...") }}';
+                statusDiv.className = 'status-checking';
+                codeInput.classList.remove('valid', 'invalid');
+                codeInput.classList.add('checking');
+                submitBtn.disabled = true;
+                formErrors.style.display = 'none';
+                return;
+            }
+
+            if (exists === null) {
+                statusDiv.innerHTML = '❓ {{ _("Unable to check") }}';
+                statusDiv.className = '';
+                codeInput.classList.remove('valid', 'invalid', 'checking');
+                submitBtn.disabled = false;
+                return;
+            }
+
+            if (exists) {
+                statusDiv.innerHTML = '❌ {{ _("This code is already taken!") }}';
+                statusDiv.className = 'status-unavailable';
+                codeInput.classList.remove('valid', 'checking');
+                codeInput.classList.add('invalid');
+                submitBtn.disabled = true;
+                formErrors.innerHTML = '{{ _("This problem code already exists. Please choose another one.") }}';
+                formErrors.style.display = 'block';
+            } else {
+                statusDiv.innerHTML = '✅ {{ _("Available!") }}';
+                statusDiv.className = 'status-available';
+                codeInput.classList.remove('invalid', 'checking');
+                codeInput.classList.add('valid');
+                submitBtn.disabled = false;
+                formErrors.style.display = 'none';
+            }
+        }
+
+        function onCodeInput() {
+            const code = codeInput.value.trim();
+
+            if (code !== currentSuggestedCode) {
+                userModified = true;
+                resetSuggestionSpan.style.display = 'inline';
+            } else {
+                userModified = false;
+                resetSuggestionSpan.style.display = 'none';
+            }
+
+            if (checkTimeout) {
+                clearTimeout(checkTimeout);
+            }
+
+            if (!code) {
+                updateStatus(null);
+                return;
+            }
+
+            updateStatus(null, true);
+
+            checkTimeout = setTimeout(async () => {
+                const exists = await checkProblemCode(code);
+                updateStatus(exists);
+            }, 500);
+        }
+
+        async function resetToSuggested() {
+            updateStatus(null, true, '🔄 {{ _("Generating new code...") }}');
+
+            const newCode = await generateUniqueCloneCode();
+            currentSuggestedCode = newCode;
+            codeInput.value = newCode;
+            userModified = false;
+            resetSuggestionSpan.style.display = 'none';
+
+            const exists = await checkProblemCode(newCode);
+            updateStatus(exists);
+        }
+
+        async function initialize() {
+            try {
+                updateStatus(null, true, '🔄 {{ _("Generating unique code...") }}');
+
+                const uniqueCode = await generateUniqueCloneCode();
+                currentSuggestedCode = uniqueCode;
+                codeInput.value = uniqueCode;
+                userModified = false;
+                resetSuggestionSpan.style.display = 'none';
+
+                const exists = await checkProblemCode(uniqueCode);
+                updateStatus(exists);
+
+                codeInput.addEventListener('input', onCodeInput);
+                resetSuggestionSpan.addEventListener('click', resetToSuggested);
+            } catch (error) {
+                console.error(error);
+                updateStatus(null, false, '❌ {{ _("Failed to generate code") }}');
+            }
+        }
+
+        document.getElementById('problem-clone-panel').addEventListener('submit', async (e) => {
+            const code = codeInput.value.trim();
+
+            if (!code) {
+                e.preventDefault();
+                formErrors.innerHTML = '{{ _("Please enter a problem code.") }}';
+                formErrors.style.display = 'block';
+                return false;
+            }
+
+            submitBtn.disabled = true;
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '{{ _("Verifying...") }}';
+
+            const exists = await checkProblemCode(code);
+
+            if (exists) {
+                e.preventDefault();
+                formErrors.innerHTML = '{{ _("This problem code already exists. Please choose another one.") }}';
+                formErrors.style.display = 'block';
+                updateStatus(true);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+                return false;
+            }
+
+            submitBtn.innerHTML = originalBtnText;
+            return true;
+        });
+
+        document.addEventListener('DOMContentLoaded', initialize);
+
+        if (codeInput) {
+            codeInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const code = codeInput.value.trim();
+                    if (code) {
+                        updateStatus(null, true);
+                        setTimeout(async () => {
+                            const exists = await checkProblemCode(code);
+                            updateStatus(exists);
+                        }, 100);
+                    }
+                }
+            });
+        }
+    </script>
 {% endblock %}
