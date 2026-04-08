@@ -45,5 +45,8 @@ importlib-metadata<5
 markdown
 markdown-katex
 
+# This is for generate docs
+pypandoc
+
 # This is for the AI hint function
 openai

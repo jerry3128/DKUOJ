@@ -192,17 +192,175 @@
     </div>
 
     <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between;">
-        <div class="contest-extracting-to-pdf">
-            <form action="{{ url('contest_export_pdf', contest.key) }}" method="post">
-                {% csrf_token %}
-                <button type="submit" class="btn">
-                    <i class="fa fa-file-pdf-o"></i>{{ _(' Export Contest to PDF') }}
-                </button>
-            </form>
-            <p style="color: #666; font-size: 14px; margin-top: 8px;">
-                {{ _('Includes contest description and problem details') }}
-            </p>
-        </div>
+        {% if can_edit %}
+            <!-- <div class="contest-extracting-to-pdf">
+                <form action="{{ url('contest_export_pdf', contest.key) }}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn">
+                        <i class="fa fa-file-pdf-o"></i>{{ _(' Export Contest to PDF') }}
+                    </button>
+                </form>
+                <p style="color: #666; font-size: 14px; margin-top: 8px;">
+                    {{ _('Includes contest description and problem details') }}
+                </p>
+            </div>
+            <div class="contest-extracting-to-word">
+                <form action="{{ url('contest_export_word', contest.key) }}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn">
+                        <i class="fa fa-file-word-o"></i>{{ _(' Export Contest to Word') }}
+                    </button>
+                </form>
+                <p style="color: #666; font-size: 14px; margin-top: 8px;">
+                    {{ _('Includes contest description and problem details') }}
+                </p>
+            </div> -->
+            <div class="contest-extracting-dropdown">
+                <div class="dropdown">
+                    <button type="button" class="btn dropdown-toggle" id="exportDropdownBtn" aria-haspopup="true" aria-expanded="false">
+                        <i class="fa fa-download"></i> {{ _('Extract the contest') }}
+                        <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="exportDropdownBtn">
+                        <li>
+                            <a href="#" data-format="pdf" class="export-option">
+                                <i class="fa fa-file-pdf-o"></i> {{ _('Extract to PDF') }}
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" data-format="word" class="export-option">
+                                <i class="fa fa-file-word-o"></i> {{ _('Extract to Word') }}
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+                <p style="color: #666; font-size: 14px; margin-top: 8px;">
+                    {{ _('Including Contest Description and Problem Details') }}
+                </p>
+                <!-- 用于生成 PDF/Word 的表单容器 -->
+                <form id="export-pdf-form" action="{{ url('contest_export_pdf', contest.key) }}" method="post" style="display: none;">
+                    {% csrf_token %}
+                </form>
+                <form id="export-word-form" action="{{ url('contest_export_word', contest.key) }}" method="post" style="display: none;">
+                    {% csrf_token %}
+                </form>
+            </div>
+
+            <style>
+                .contest-extracting-dropdown {
+                    margin-bottom: 1em;
+                }
+                .dropdown {
+                    position: relative;
+                    display: inline-block;
+                }
+                .dropdown-toggle {
+                    background-color: #f5f5f5;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    padding: 6px 12px;
+                    cursor: pointer;
+                    font-size: 14px;
+                    line-height: 1.42857143;
+                    text-align: center;
+                    white-space: nowrap;
+                }
+                .dropdown-toggle .caret {
+                    display: inline-block;
+                    width: 0;
+                    height: 0;
+                    margin-left: 5px;
+                    vertical-align: middle;
+                    border-top: 4px dashed;
+                    border-right: 4px solid transparent;
+                    border-left: 4px solid transparent;
+                }
+                .dropdown-menu {
+                    position: absolute;
+                    top: 100%;
+                    left: 0;
+                    z-index: 1000;
+                    display: none;
+                    float: left;
+                    min-width: 160px;
+                    padding: 5px 0;
+                    margin: 2px 0 0;
+                    font-size: 14px;
+                    text-align: left;
+                    list-style: none;
+                    background-color: #fff;
+                    background-clip: padding-box;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    box-shadow: 0 6px 12px rgba(0,0,0,.175);
+                }
+                .dropdown-menu li a {
+                    display: block;
+                    padding: 3px 20px;
+                    clear: both;
+                    font-weight: normal;
+                    line-height: 1.42857143;
+                    color: #333;
+                    white-space: nowrap;
+                    text-decoration: none;
+                }
+                .dropdown-menu li a:hover {
+                    background-color: #e6e6e6;
+                    color: #262626;
+                }
+                .dropdown.open .dropdown-menu {
+                    display: block;
+                }
+            </style>
+
+            <script type="text/javascript">
+                $(document).ready(function() {
+                    // 下拉菜单交互
+                    $('.dropdown-toggle').on('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        $('.dropdown').toggleClass('open');
+                    });
+
+                    $(document).on('click', function(e) {
+                        if (!$(e.target).closest('.dropdown').length) {
+                            $('.dropdown').removeClass('open');
+                        }
+                    });
+
+                    // 导出选项点击处理
+                    $('.export-option').on('click', function(e) {
+                        e.preventDefault();
+                        var format = $(this).data('format');
+                        var $btn = $('#exportDropdownBtn');
+                        var originalHtml = $btn.html();
+
+                        // 显示加载状态
+                        $btn.html('<i class="fa fa-spinner fa-spin"></i> {{ _("Generating ...") }}');
+                        $btn.prop('disabled', true);
+
+                        // 根据格式提交对应的表单
+                        if (format === 'pdf') {
+                            $('#export-pdf-form').submit();
+                        } else if (format === 'word') {
+                            $('#export-word-form').submit();
+                        }
+
+                        // 由于表单提交会刷新页面，这里无需恢复按钮状态；但如果使用ajax，则需要恢复。这里保持简单。
+                        // 为了防止快速多次点击，延迟关闭下拉菜单
+                        $('.dropdown').removeClass('open');
+                        // 注意：如果生成过程很长，按钮会保持禁用直到页面重载；若出现网络错误无重载，用户无法恢复，但罕见。
+                        // 可添加超时恢复（可选）
+                        setTimeout(function() {
+                            if ($btn.prop('disabled')) {
+                                $btn.html(originalHtml);
+                                $btn.prop('disabled', false);
+                            }
+                        }, 10000);
+                    });
+                });
+            </script>
+        {% endif %}
 
         {% if can_edit %}
             <div style="margin-bottom: 1em; text-align: right;">
