@@ -196,13 +196,16 @@ class SubmissionStatus(SubmissionCommentMixin, SubmissionDetailBase):
             context['first_failed_case_id'] = first_failed.case
 
         # AI hints context
-        context['ai_hints_enabled'] = (
+        context['ai_hints_possible'] = (
             submission.problem.ai_hints_enabled
             and ai_hints.is_configured()
+        )
+        context['ai_hints_enabled'] = (
+            context['ai_hints_possible']
             and submission.status == 'D'
             and submission.result != 'AC'
         )
-        if context['ai_hints_enabled'] and self.request.user.is_authenticated:
+        if context['ai_hints_possible'] and self.request.user.is_authenticated:
             context['ai_hints_remaining'] = ai_hints.get_remaining(self.request.profile.id)
         else:
             context['ai_hints_remaining'] = 0
@@ -260,12 +263,33 @@ class SubmissionAIHint(LoginRequiredMixin, SubmissionMixin, DetailView):
         if remaining <= 0:
             return JsonResponse({'error': 'You have used all your AI hints for today. Try again tomorrow.'}, status=429)
 
+        from judge.models.ai_hints import AIHintLog
+
+        log = AIHintLog(
+            user_id=request.profile.id,
+            submission=submission,
+            problem=submission.problem,
+            submission_result=submission.result,
+            submission_date=submission.date,
+        )
         try:
-            hint = ai_hints.get_hint(submission)
+            result = ai_hints.get_hint(submission)
+            log.success = True
+            log.hint_text = result.hint_text
+            log.prompt_tokens = result.prompt_tokens
+            log.completion_tokens = result.completion_tokens
+            log.total_tokens = result.total_tokens
+            log.model_name = result.model_name
+            log.response_time_ms = result.response_time_ms
         except Exception as e:
+            log.success = False
+            log.error_message = str(e)[:2000]
+            log.save()
             return JsonResponse({'error': f'AI hint unavailable: {e}'}, status=503)
 
-        return JsonResponse({'hint': hint, 'remaining': ai_hints.get_remaining(request.profile.id)})
+        log.save()
+        ai_hints._increment(request.profile.id)
+        return JsonResponse({'hint': result.hint_text, 'remaining': ai_hints.get_remaining(request.profile.id)})
 
 
 class SubmissionSourceRaw(SubmissionSource):
