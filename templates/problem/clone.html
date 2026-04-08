@@ -121,34 +121,40 @@
             }
 
             try {
-                const response = await fetch(`/problem/${encodeURIComponent(code)}`, {
+                const response = await fetch(`/api/v2/problem/check-code/?code=${encodeURIComponent(code)}`, {
                     method: 'GET',
-                    cache: 'no-cache'
+                    cache: 'no-cache',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
                 });
 
-                if (response.status === 200) return true;
-                if (response.status === 404) return false;
-                return null;
+                if (!response.ok) {
+                    return null;
+                }
+
+                const data = await response.json();
+                return data.exists;
             } catch (error) {
-                console.error('检查失败:', error);
+                console.error('Checking Failed:', error);
                 return null;
             }
         }
 
-        // 只保留这一个：从 00000 开始递增
+        
         async function generateUniqueCloneCode() {
-            const max = 100000;
+            const max = 1000000;
 
             for (let i = 0; i < max; i++) {
-                const code = `clone${i.toString().padStart(5, '0')}`;
+                const code = `clone${i.toString().padStart(6, '0')}`;
                 const exists = await checkProblemCode(code);
 
-                if (exists === false || exists === null) {
+                if (exists === false) {
                     return code;
                 }
             }
 
-            const timestamp = Date.now().toString().slice(-5);
+            const timestamp = Date.now().toString().slice(-6);
             return `clone${timestamp}`;
         }
 

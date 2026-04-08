@@ -279,8 +279,10 @@ urlpatterns = [
 
     path('api/v2/', include([
         path('contests', api.api_v2.APIContestList.as_view()),
+        path('contest/check-key/', contests.ContestKeyCheckView.as_view(), name='contest_check_key'),
         path('contest/<str:contest>', api.api_v2.APIContestDetail.as_view()),
         path('problems', api.api_v2.APIProblemList.as_view()),
+        path('problem/check-code/', problem.ProblemCodeCheckView.as_view(), name='problem_check_code'),
         path('problem/<str:problem>', api.api_v2.APIProblemDetail.as_view()),
         path('users', api.api_v2.APIUserList.as_view()),
         path('user/<str:user>', api.api_v2.APIUserDetail.as_view()),
