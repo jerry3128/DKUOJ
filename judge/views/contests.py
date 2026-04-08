@@ -1509,7 +1509,7 @@ class ContestExportPDF(ContestMixin, View):
 
 
 class ContestExportScores(ContestMixin, PermissionRequiredMixin, BaseDetailView):
-    permission_required = 'judge.change_contest'
+    permission_required = 'judge.edit_own_contest'
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -1527,7 +1527,7 @@ class ContestExportScores(ContestMixin, PermissionRequiredMixin, BaseDetailView)
 
 
 class ContestExportSubmissions(ContestMixin, PermissionRequiredMixin, BaseDetailView):
-    permission_required = 'judge.change_contest'
+    permission_required = 'judge.edit_own_contest'
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
