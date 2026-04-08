@@ -100,6 +100,11 @@ class OrganizationList(TitleMixin, ListView):
     def get_queryset(self):
         return super(OrganizationList, self).get_queryset().annotate(member_count=Count('member')).order_by('name')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['admin_email'] = settings.ADMINS[0][1] if settings.ADMINS else ''
+        return context
+
 
 class OrganizationHome(OrganizationDetailView):
     template_name = 'organization/home.html'
