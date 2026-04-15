@@ -1,3 +1,4 @@
+import difflib
 import statistics
 from collections import defaultdict
 from itertools import combinations
@@ -11,6 +12,7 @@ def get_contest_analytics(contest):
     """Compute all analytics metrics for a contest. Returns dict with summary stats,
     per-student metrics, chart data, and cross-student similarity."""
     from judge.models.contest import ContestParticipation
+    from judge.models.problem import ProblemTemplate
     from judge.models.submission import Submission, SubmissionSource
 
     # Fetch participations (exclude virtual and disqualified)
@@ -50,6 +52,13 @@ def get_contest_analytics(contest):
     problem_ids = [cp[0] for cp in contest_problems]
     problem_info = {cp[0]: {'code': cp[1], 'name': cp[2], 'max_points': cp[3]} for cp in contest_problems}
 
+    # Per-(problem, language) starter templates; used to exclude template boilerplate
+    # from code-pattern metrics and cross-student identifier similarity.
+    templates = {
+        (t.problem_id, t.language_id): t.code
+        for t in ProblemTemplate.objects.filter(problem_id__in=problem_ids)
+    }
+
     # Group submissions by user
     subs_by_user = defaultdict(list)
     for s in submissions:
@@ -79,7 +88,7 @@ def get_contest_analytics(contest):
 
         attempt = _compute_attempt_metrics(uid, user_subs, subs_by_user_problem, problem_ids, problem_info)
         timing = _compute_timing_metrics(uid, user_subs, subs_by_user_problem, problem_ids, p, contest)
-        code = _compute_code_metrics(uid, user_subs, subs_by_user_problem, problem_ids, sources)
+        code = _compute_code_metrics(uid, user_subs, subs_by_user_problem, problem_ids, sources, templates)
         score = _compute_score_metrics(uid, p, subs_by_user_problem, problem_ids, problem_info, problem_ac_rates)
 
         student_metrics[uid] = {
@@ -95,7 +104,7 @@ def get_contest_analytics(contest):
         }
 
     # Cross-student similarity
-    similarity = _compute_cross_student_similarity(subs_by_user_problem, problem_ids, sources, submissions)
+    similarity = _compute_cross_student_similarity(subs_by_user_problem, problem_ids, sources, submissions, templates)
 
     # Compute anomaly scores
     _compute_anomaly_scores(student_metrics)
@@ -178,12 +187,20 @@ def _compute_problem_ac_rates(subs_by_user_problem, user_ids, problem_ids):
 
 
 def _compute_attempt_metrics(uid, user_subs, subs_by_user_problem, problem_ids, problem_info):
-    """Compute attempt pattern metrics for a student."""
+    """Compute attempt pattern metrics for a student.
+
+    Rates use problems_attempted as the denominator so that a student who
+    solved one easy problem on the first try but gave up on the rest is not
+    flagged as suspiciously high-accuracy. avg_attempts_before_ac likewise
+    counts every attempted problem (for unsolved ones, it uses the total
+    submission count), so giving up on a hard problem pulls the average up
+    rather than leaving it defined only over easy wins.
+    """
     problems_solved = 0
-    first_try_ac = 0
-    total_attempts_before_ac = []
-    no_progression_count = 0
     problems_attempted = 0
+    first_try_ac = 0
+    attempts_per_attempted_problem = []
+    no_progression_count = 0
 
     for pid in problem_ids:
         ups = subs_by_user_problem.get((uid, pid), [])
@@ -191,15 +208,16 @@ def _compute_attempt_metrics(uid, user_subs, subs_by_user_problem, problem_ids, 
             continue
         problems_attempted += 1
         solved = any(s.result == 'AC' for s in ups)
+
+        attempts = 0
+        for s in ups:
+            attempts += 1
+            if s.result == 'AC':
+                break
+        attempts_per_attempted_problem.append(attempts)
+
         if solved:
             problems_solved += 1
-            # Count attempts before first AC
-            attempts = 0
-            for s in ups:
-                attempts += 1
-                if s.result == 'AC':
-                    break
-            total_attempts_before_ac.append(attempts)
             if attempts == 1:
                 first_try_ac += 1
 
@@ -208,12 +226,14 @@ def _compute_attempt_metrics(uid, user_subs, subs_by_user_problem, problem_ids, 
             max_total = max((s.case_total for s in ups if s.case_total and s.case_total > 0), default=0)
             if len(points_sequence) >= 1 and max_total > 0:
                 has_partial = any(0 < p < max_total for p in points_sequence)
-                if not has_partial and solved:
+                if not has_partial:
                     no_progression_count += 1
 
-    first_try_ac_rate = round(first_try_ac / problems_solved * 100, 1) if problems_solved > 0 else 0
-    avg_attempts = round(statistics.mean(total_attempts_before_ac), 2) if total_attempts_before_ac else 0
-    no_progression_rate = round(no_progression_count / problems_solved * 100, 1) if problems_solved > 0 else 0
+    first_try_ac_rate = round(first_try_ac / problems_attempted * 100, 1) if problems_attempted > 0 else 0
+    no_progression_rate = round(no_progression_count / problems_attempted * 100, 1) if problems_attempted > 0 else 0
+    avg_attempts = (
+        round(statistics.mean(attempts_per_attempted_problem), 2) if attempts_per_attempted_problem else 0
+    )
 
     return {
         'problems_solved': problems_solved,
@@ -265,6 +285,28 @@ def _compute_timing_metrics(uid, user_subs, subs_by_user_problem, problem_ids, p
     }
 
 
+def _strip_template(source, template):
+    """Return only the portion of ``source`` the student wrote themselves,
+    using a line-level diff against the problem template.
+
+    Lines equal to template lines (same content, same relative position) are
+    dropped; lines the student inserted or rewrote in-place are kept. Lines
+    the student deleted from the template naturally don't appear in the
+    output, so deleting template comments doesn't leak them into the metric.
+    If there is no template, the source is returned unchanged.
+    """
+    if not template:
+        return source
+    src_lines = source.splitlines(keepends=True)
+    tmpl_lines = template.splitlines(keepends=True)
+    matcher = difflib.SequenceMatcher(a=tmpl_lines, b=src_lines, autojunk=False)
+    added = []
+    for tag, _i1, _i2, j1, j2 in matcher.get_opcodes():
+        if tag in ('insert', 'replace'):
+            added.extend(src_lines[j1:j2])
+    return ''.join(added)
+
+
 def _tokenize_source(source, language_pygments):
     """Tokenize source code using Pygments. Returns (comment_tokens, name_tokens, total_tokens)."""
     try:
@@ -285,8 +327,13 @@ def _tokenize_source(source, language_pygments):
     return comment_tokens, name_tokens, len(tokens)
 
 
-def _compute_code_metrics(uid, user_subs, subs_by_user_problem, problem_ids, sources):
-    """Compute code style metrics using Pygments tokenization."""
+def _compute_code_metrics(uid, user_subs, subs_by_user_problem, problem_ids, sources, templates):
+    """Compute code style metrics using Pygments tokenization.
+
+    If a problem provides a starter template in the submission's language,
+    the template boilerplate is stripped before tokenizing so the metrics
+    reflect only what the student wrote themselves.
+    """
     comment_densities = []
     source_lengths = []
 
@@ -303,17 +350,22 @@ def _compute_code_metrics(uid, user_subs, subs_by_user_problem, problem_ids, sou
         if best_sub is None:
             continue
 
-        source = sources.get(best_sub.id)
-        if not source:
+        raw_source = sources.get(best_sub.id)
+        if not raw_source:
             continue
 
-        source_lengths.append(len(source))
+        template = templates.get((pid, best_sub.language_id))
+        student_source = _strip_template(raw_source, template)
+        if not student_source.strip():
+            continue
+
+        source_lengths.append(len(student_source))
 
         lang_pygments = best_sub.language.pygments if hasattr(best_sub.language, 'pygments') else None
         if not lang_pygments:
             continue
 
-        comment_tokens, name_tokens, total_tokens = _tokenize_source(source, lang_pygments)
+        comment_tokens, name_tokens, total_tokens = _tokenize_source(student_source, lang_pygments)
         if total_tokens > 0:
             comment_densities.append(len(comment_tokens) / total_tokens)
 
@@ -372,11 +424,14 @@ def _compute_score_metrics(uid, participation, subs_by_user_problem, problem_ids
     }
 
 
-def _compute_cross_student_similarity(subs_by_user_problem, problem_ids, sources, submissions):
-    """Compute identifier similarity between student pairs per problem."""
-    # Extract identifiers per (user, problem)
+def _compute_cross_student_similarity(subs_by_user_problem, problem_ids, sources, submissions, templates):
+    """Compute identifier similarity between student pairs per problem.
+
+    Identifiers that come from the problem template are stripped out so that
+    two students who both use a shared starter template don't look similar
+    for reusing template variable names.
+    """
     identifiers_by_up = {}
-    # sub_lookup = {s.id: s for s in submissions}
 
     for (uid, pid), ups in subs_by_user_problem.items():
         if pid not in problem_ids:
@@ -390,17 +445,23 @@ def _compute_cross_student_similarity(subs_by_user_problem, problem_ids, sources
         if best_sub is None:
             continue
 
-        source = sources.get(best_sub.id)
-        if not source:
+        raw_source = sources.get(best_sub.id)
+        if not raw_source:
             continue
 
         lang_pygments = best_sub.language.pygments if hasattr(best_sub.language, 'pygments') else None
         if not lang_pygments:
             continue
 
-        _, name_tokens, _ = _tokenize_source(source, lang_pygments)
-        # Filter to meaningful identifiers (length > 1)
+        template = templates.get((pid, best_sub.language_id))
+        student_source = _strip_template(raw_source, template)
+        if not student_source.strip():
+            continue
+
+        _, name_tokens, _ = _tokenize_source(student_source, lang_pygments)
         identifiers = set(t for t in name_tokens if len(t) > 1)
+        if not identifiers:
+            continue
         identifiers_by_up[(uid, pid)] = identifiers
 
     # Compute per-problem similarity between all student pairs
