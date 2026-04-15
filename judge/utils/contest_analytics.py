@@ -66,7 +66,7 @@ def get_contest_analytics(contest):
     problem_ac_rates = _compute_problem_ac_rates(subs_by_user_problem, user_ids, problem_ids)
 
     # Build participation lookup
-    part_by_user = {p.user_id: p for p in participations}
+    # part_by_user = {p.user_id: p for p in participations}
 
     # Compute all metric categories
     summary = _compute_summary_stats(participations, submissions, problem_ids, problem_info)
@@ -376,7 +376,7 @@ def _compute_cross_student_similarity(subs_by_user_problem, problem_ids, sources
     """Compute identifier similarity between student pairs per problem."""
     # Extract identifiers per (user, problem)
     identifiers_by_up = {}
-    sub_lookup = {s.id: s for s in submissions}
+    # sub_lookup = {s.id: s for s in submissions}
 
     for (uid, pid), ups in subs_by_user_problem.items():
         if pid not in problem_ids:
