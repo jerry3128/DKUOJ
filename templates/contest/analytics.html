@@ -639,6 +639,41 @@
         </table>
     </div>
 
+    {# Cross-Student Similarity #}
+    {% if similarity_sections %}
+        <h3 class="section-header">{{ _('Cross-Student Code Similarity') }}</h3>
+        <p style="font-size: 0.85em; color: #666; margin-bottom: 12px;">
+            {{ _('Jaccard similarity of code identifiers between student pairs, per problem, after stripping tokens from the starter template. Only pairs above 0.5 are shown. High values warrant review but are not proof of misconduct.') }}
+        </p>
+        {% for section in similarity_sections %}
+            <h4 style="margin-top: 16px;">
+                {{ section.problem_code }} &mdash; {{ section.problem_name }}
+            </h4>
+            <div class="analytics-table-container">
+                <table class="analytics-table">
+                    <thead>
+                        <tr>
+                            <th>{{ _('Student A') }}</th>
+                            <th>{{ _('Student B') }}</th>
+                            <th>{{ _('Similarity') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for pair in section.pairs %}
+                        <tr>
+                            <td><strong>{{ pair.user1 }}</strong></td>
+                            <td><strong>{{ pair.user2 }}</strong></td>
+                            <td class="{% if pair.similarity >= 0.8 %}cell-outlier{% else %}cell-notable{% endif %}">
+                                {{ pair.similarity }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endfor %}
+    {% endif %}
+
     {# Class Submission Timeline #}
     {% if has_timeline_data %}
         <h3 class="section-header">{{ _('Class Submission Timeline') }}</h3>

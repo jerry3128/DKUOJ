@@ -60,9 +60,27 @@ class ContestAnalytics(TitleMixin, ContestMixin, DetailView):
 
         context['analytics_summary'] = analytics['summary']
         context['students_list'] = students_list
-        context['similarity'] = analytics['similarity']
         context['problems'] = analytics['problems']
         context['problem_ac_rates'] = analytics['problem_ac_rates']
+
+        uid_to_username = {s['user_id']: s['username'] for s in students_list}
+        similarity_sections = []
+        for pid, pairs in analytics['similarity'].items():
+            prob = analytics['problems'].get(pid, {})
+            similarity_sections.append({
+                'problem_code': prob.get('code', ''),
+                'problem_name': prob.get('name', ''),
+                'pairs': [
+                    {
+                        'user1': uid_to_username.get(p['user1'], '?'),
+                        'user2': uid_to_username.get(p['user2'], '?'),
+                        'similarity': p['similarity'],
+                    }
+                    for p in pairs
+                ],
+            })
+        similarity_sections.sort(key=lambda s: -(s['pairs'][0]['similarity'] if s['pairs'] else 0))
+        context['similarity_sections'] = similarity_sections
 
         # JSON data for charts (escape </ to prevent script tag injection)
         context['timeline_json'] = mark_safe(json.dumps(analytics['timeline']).replace('</', '<\\/'))
