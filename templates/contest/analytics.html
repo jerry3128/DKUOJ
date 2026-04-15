@@ -168,6 +168,19 @@
             padding-bottom: 6px;
             border-bottom: 1px solid #dee2e6;
         }
+
+        .toggle {
+            cursor: pointer;
+            user-select: none;
+        }
+        .toggle::before {
+            content: '\25B8\00A0';
+            display: inline-block;
+            width: 1em;
+        }
+        .toggle.open::before {
+            content: '\25BE\00A0';
+        }
     </style>
 {% endblock %}
 
@@ -503,7 +516,7 @@
                     data-comment_density="{{ student.code.avg_comment_density }}"
                     data-avg_source_length="{{ student.code.avg_source_length }}"
                     data-anomaly_score="{{ student.anomaly_score }}">
-                    <td><strong>{{ student.username }}</strong></td>
+                    <td><strong><a href="{{ url('contest_all_user_submissions', contest.key, student.username) }}" target="_blank" rel="noopener" onclick="event.stopPropagation()">{{ student.username }}</a></strong></td>
                     <td>{{ student.score }}</td>
                     <td>{{ student.problems_solved }}</td>
                     <td>{{ student.total_submissions }}</td>
@@ -641,37 +654,41 @@
 
     {# Cross-Student Similarity #}
     {% if similarity_sections %}
-        <h3 class="section-header">{{ _('Cross-Student Code Similarity') }}</h3>
-        <p style="font-size: 0.85em; color: #666; margin-bottom: 12px;">
-            {{ _('Jaccard similarity of code identifiers between student pairs, per problem, after stripping tokens from the starter template. Only pairs above 0.5 are shown. High values warrant review but are not proof of misconduct.') }}
-        </p>
-        {% for section in similarity_sections %}
-            <h4 style="margin-top: 16px;">
-                {{ section.problem_code }} &mdash; {{ section.problem_name }}
-            </h4>
-            <div class="analytics-table-container">
-                <table class="analytics-table">
-                    <thead>
-                        <tr>
-                            <th>{{ _('Student A') }}</th>
-                            <th>{{ _('Student B') }}</th>
-                            <th>{{ _('Similarity') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    {% for pair in section.pairs %}
-                        <tr>
-                            <td><strong>{{ pair.user1 }}</strong></td>
-                            <td><strong>{{ pair.user2 }}</strong></td>
-                            <td class="{% if pair.similarity >= 0.8 %}cell-outlier{% else %}cell-notable{% endif %}">
-                                {{ pair.similarity }}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        {% endfor %}
+        <h3 class="section-header toggle open">{{ _('Cross-Student Code Similarity') }}</h3>
+        <div class="toggled">
+            <p style="font-size: 0.85em; color: #666; margin-bottom: 12px;">
+                {{ _('Jaccard similarity of code identifiers between student pairs, per problem, after stripping tokens from the starter template. Only pairs above 0.5 are shown. High values warrant review but are not proof of misconduct.') }}
+            </p>
+            {% for section in similarity_sections %}
+                <h4 class="toggle closed" style="margin-top: 16px;">
+                    {{ section.problem_code }} &mdash; {{ section.problem_name }} ({{ section.pairs|length }} {{ _('pairs') }})
+                </h4>
+                <div class="toggled" style="display: none;">
+                    <div class="analytics-table-container">
+                        <table class="analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>{{ _('Student A') }}</th>
+                                    <th>{{ _('Student B') }}</th>
+                                    <th>{{ _('Similarity') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for pair in section.pairs %}
+                                <tr>
+                                    <td><strong><a href="{{ url('contest_user_submissions', contest.key, pair.user1, section.problem_code) }}" target="_blank" rel="noopener">{{ pair.user1 }}</a></strong></td>
+                                    <td><strong><a href="{{ url('contest_user_submissions', contest.key, pair.user2, section.problem_code) }}" target="_blank" rel="noopener">{{ pair.user2 }}</a></strong></td>
+                                    <td class="{% if pair.similarity >= 0.8 %}cell-outlier{% else %}cell-notable{% endif %}">
+                                        {{ pair.similarity }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
     {% endif %}
 
     {# Class Submission Timeline #}
