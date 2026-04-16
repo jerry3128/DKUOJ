@@ -1502,7 +1502,7 @@ class ContestExportPDF(ContestMixin, View):
                     format='html',
                     outputfile=pdf_path,
                     extra_args=[
-                        '--pdf-engine=pdflatex',
+                        '--pdf-engine=lualatex',
                         '--mathjax',
 
                         '-V', 'geometry:margin=1in',
