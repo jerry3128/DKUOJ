@@ -146,7 +146,7 @@
             const max = 1000000;
 
             for (let i = 0; i < max; i++) {
-                const code = `clone${i.toString().padStart(6, '0')}`;
+                const code = `p${i.toString().padStart(6, '0')}`;
                 const exists = await checkProblemCode(code);
 
                 if (exists === false) {

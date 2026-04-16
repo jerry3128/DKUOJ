@@ -152,7 +152,7 @@
         const max = 1000000;
 
         for (let i = 0; i < max; i++) {
-            const key = `contest${i.toString().padStart(6, '0')}`;
+            const key = `c${i.toString().padStart(6, '0')}`;
             const exists = await checkContestKey(key);
 
             if (exists === false) return key;
