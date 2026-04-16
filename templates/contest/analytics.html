@@ -181,6 +181,59 @@
         .toggle.open::before {
             content: '\25BE\00A0';
         }
+
+        .section-hint {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .summary-card {
+                background: #1f1f1f;
+                border-color: #3b3b3b;
+            }
+            .summary-card .value { color: #eee; }
+            .summary-card .label { color: #aaa; }
+
+            .analytics-table th {
+                background: #2a2a2a;
+                border-bottom-color: #555;
+            }
+            .analytics-table th:hover { background: #333; }
+            .analytics-table td { border-bottom-color: #333; }
+            .analytics-table tr:hover { background: #2a2a2a; }
+
+            .cell-notable {
+                background-color: #5c4a00;
+                color: #fde68a;
+            }
+            .cell-outlier {
+                background-color: #5c1a1f;
+                color: #fca5a5;
+            }
+
+            .student-detail {
+                background: #1a1a1a;
+                border-bottom-color: #3b3b3b;
+            }
+            .detail-section h4 { color: #ccc; }
+            .detail-section .metric .metric-label { color: #aaa; }
+
+            .outlier-badge {
+                background: #5c1a1f;
+                color: #fca5a5;
+            }
+
+            .disclaimer {
+                background: #2a2a2a;
+                color: #ccc;
+            }
+
+            .section-header { border-bottom-color: #3b3b3b; }
+
+            .section-hint { color: #aaa; }
+        }
     </style>
 {% endblock %}
 
@@ -483,8 +536,9 @@
     </div>
 
     {# Student Overview Table #}
-    <h3 class="section-header">{{ _('Student Behavior Overview') }}</h3>
-    <p style="font-size: 0.85em; color: #666; margin-bottom: 12px;">
+    <h3 class="section-header toggle open">{{ _('Student Behavior Overview') }}</h3>
+    <div class="toggled">
+    <p class="section-hint">
         {{ _('Click column headers to sort. Click a student row to see their submission timeline.') }}
     </p>
     <div class="analytics-table-container">
@@ -651,12 +705,13 @@
             </tbody>
         </table>
     </div>
+    </div>
 
     {# Cross-Student Similarity #}
     {% if similarity_sections %}
         <h3 class="section-header toggle open">{{ _('Cross-Student Code Similarity') }}</h3>
         <div class="toggled">
-            <p style="font-size: 0.85em; color: #666; margin-bottom: 12px;">
+            <p class="section-hint">
                 {{ _('Jaccard similarity of code identifiers between student pairs, per problem, after stripping tokens from the starter template. Only pairs above 0.5 are shown. High values warrant review but are not proof of misconduct.') }}
             </p>
             {% for section in similarity_sections %}
@@ -693,12 +748,14 @@
 
     {# Class Submission Timeline #}
     {% if has_timeline_data %}
-        <h3 class="section-header">{{ _('Class Submission Timeline') }}</h3>
-        <p style="font-size: 0.85em; color: #666;">
-            {{ _('Each dot is a submission. Colors indicate result (green=AC, red=WA, etc.). X-axis shows hours from contest start.') }}
-        </p>
-        <div class="chart-container">
-            <canvas id="class-timeline-canvas"></canvas>
+        <h3 class="section-header toggle open">{{ _('Class Submission Timeline') }}</h3>
+        <div class="toggled">
+            <p class="section-hint">
+                {{ _('Each dot is a submission. Colors indicate result (green=AC, red=WA, etc.). X-axis shows hours from contest start.') }}
+            </p>
+            <div class="chart-container">
+                <canvas id="class-timeline-canvas"></canvas>
+            </div>
         </div>
     {% endif %}
 {% endblock %}
