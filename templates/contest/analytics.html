@@ -244,7 +244,6 @@
         var timelineData = {{ timeline_json }};
         var studentsData = {{ students_json }};
         var problemAcRates = {{ problem_ac_rates_json }};
-        var classTimelineChart = null;
 
         // Color mapping for submission results
         var resultColors = {
@@ -329,16 +328,6 @@
             if (timelineData.submissions.length > 0) {
                 drawClassTimeline();
             }
-
-            // Chart.js with responsive:true + maintainAspectRatio:false shrinks the
-            // canvas to 0 while its container is display:none (from slideUp), and
-            // doesn't always recover on slideDown. Force a resize after the
-            // slide-in animation finishes.
-            $('#class-timeline-canvas').closest('.toggled').prev('.toggle')
-                .on('click', function() {
-                    if (!classTimelineChart) return;
-                    setTimeout(function() { classTimelineChart.resize(); }, 450);
-                });
         });
 
         function drawClassTimeline() {
@@ -378,7 +367,7 @@
             });
 
             canvas.height = Math.max(300, students.length * 20 + 80);
-            classTimelineChart = new Chart(ctx, {
+            new Chart(ctx, {
                 type: 'scatter',
                 data: {datasets: datasets},
                 options: {
