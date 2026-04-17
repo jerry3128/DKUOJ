@@ -244,6 +244,7 @@
         var timelineData = {{ timeline_json }};
         var studentsData = {{ students_json }};
         var problemAcRates = {{ problem_ac_rates_json }};
+        var classTimelineChart = null;
 
         // Color mapping for submission results
         var resultColors = {
@@ -328,6 +329,21 @@
             if (timelineData.submissions.length > 0) {
                 drawClassTimeline();
             }
+
+            // Re-render timeline after collapse/expand: Chart.js v2 loses its sizing
+            // when its container is display:none'd by register_toggle's .hide(400).
+            var $timelineToggle = $('#class-timeline-canvas').closest('.toggled').prev('.toggle');
+            $timelineToggle.on('click', function () {
+                setTimeout(function () {
+                    if ($('#class-timeline-canvas').is(':visible') && timelineData.submissions.length > 0) {
+                        if (classTimelineChart) {
+                            classTimelineChart.destroy();
+                            classTimelineChart = null;
+                        }
+                        drawClassTimeline();
+                    }
+                }, 450);
+            });
         });
 
         function drawClassTimeline() {
@@ -367,7 +383,7 @@
             });
 
             canvas.height = Math.max(300, students.length * 20 + 80);
-            new Chart(ctx, {
+            classTimelineChart = new Chart(ctx, {
                 type: 'scatter',
                 data: {datasets: datasets},
                 options: {
