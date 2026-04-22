@@ -254,7 +254,11 @@ $(function () {
     register_time($('.time-with-rel'));
 
     $('form').submit(function (evt) {
-        // Prevent multiple submissions of forms, see #565, #1776
+        // Prevent multiple submissions of forms, see #565, #1776.
+        // Skip for target="_blank" forms: the response opens in a new tab and the
+        // current page is not navigated away, so leaving buttons disabled here
+        // would strand the user with an unusable button until they refresh.
+        if ($(this).attr('target') === '_blank') return;
         $("button[type=submit], input[type=submit]").prop('disabled', true);
     });
 });
