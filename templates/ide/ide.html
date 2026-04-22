@@ -23,12 +23,23 @@
             inputEditor.setFontSize(14);
             inputEditor.getSession().setUseWrapMode(true);
 
-            var outputDisplay = ace.edit("output-display");
-            outputDisplay.setTheme("ace/theme/{{ ace_theme }}");
-            outputDisplay.setReadOnly(true);
-            outputDisplay.setFontSize(14);
-            outputDisplay.getSession().setUseWrapMode(true);
-            outputDisplay.renderer.setShowGutter(false);
+            var $outputDisplay = $('#output-display');
+
+            function escHtml(s) {
+                return $('<div/>').text(s == null ? '' : String(s)).html();
+            }
+
+            // Sets the output panel contents. Callers must pre-escape any
+            // untrusted text with escHtml(); values that originate from the
+            // server's ansi2html conversion are already safe HTML and can
+            // be inserted as-is.
+            function setOutputHtml(html) {
+                $outputDisplay.html(html).scrollTop(0);
+            }
+
+            function setOutputText(text) {
+                setOutputHtml(escHtml(text));
+            }
 
             // Language selection
             $('#language-select').select2({
@@ -102,17 +113,17 @@
                 var customInput = inputEditor.getValue();
 
                 if (!sourceCode.trim()) {
-                    outputDisplay.setValue('{{ _("Error: Source code cannot be empty") }}', -1);
+                    setOutputText('{{ _("Error: Source code cannot be empty") }}');
                     return;
                 }
 
                 if (!languageId) {
-                    outputDisplay.setValue('{{ _("Error: Please select a language") }}', -1);
+                    setOutputText('{{ _("Error: Please select a language") }}');
                     return;
                 }
 
                 button.prop('disabled', true).text('{{ _("Running...") }}');
-                outputDisplay.setValue('{{ _("Submitting code to judge...") }}', -1);
+                setOutputText('{{ _("Submitting code to judge...") }}');
 
                 $.ajax({
                     url: '{{ url("ide_submit") }}',
@@ -125,7 +136,7 @@
                     },
                     success: function(response) {
                         currentSubmissionId = response.submission_id;
-                        outputDisplay.setValue('{{ _("Submission received. Judging...") }}\n', -1);
+                        setOutputText('{{ _("Submission received. Judging...") }}\n');
 
                         // Start polling for status
                         statusCheckInterval = setInterval(checkSubmissionStatus, 500);
@@ -138,7 +149,7 @@
                         } else {
                             error += '{{ _("Unknown error occurred") }}';
                         }
-                        outputDisplay.setValue(error, -1);
+                        setOutputText(error);
                     }
                 });
             });
@@ -157,43 +168,46 @@
                             clearInterval(statusCheckInterval);
                             $('#run-button').prop('disabled', false).text('{{ _("Run Code") }}');
 
-                            var output = '';
+                            // Build output as HTML. Labels and numeric fields
+                            // are escaped; data.error/output/feedback/extended_feedback
+                            // arrive from the server as ansi2html-converted HTML and
+                            // are inserted as-is.
+                            var html = '';
 
                             if (data.status === 'CE') {
-                                output = '{{ _("Compilation Error") }}\n\n';
-                                output += data.error || '{{ _("(no error message)") }}';
+                                html = escHtml('{{ _("Compilation Error") }}') + '\n\n';
+                                html += data.error || escHtml('{{ _("(no error message)") }}');
                             } else if (data.status === 'IE') {
-                                output = '{{ _("Internal Error") }}\n\n';
-                                output += '{{ _("An error occurred on the judge server. Please try again or contact an administrator.") }}';
+                                html = escHtml('{{ _("Internal Error") }}') + '\n\n';
+                                html += escHtml('{{ _("An error occurred on the judge server. Please try again or contact an administrator.") }}');
                             } else if (data.status === 'AB') {
-                                output = '{{ _("Aborted") }}\n\n';
-                                output += '{{ _("The submission was aborted.") }}';
+                                html = escHtml('{{ _("Aborted") }}') + '\n\n';
+                                html += escHtml('{{ _("The submission was aborted.") }}');
                             } else {
                                 // Normal completion
-                                output = '{{ _("Result:") }} ' + (data.result || 'N/A') + '\n';
+                                html = escHtml('{{ _("Result:") }} ' + (data.result || 'N/A')) + '\n';
 
                                 // Show feedback for error results (IR, RTE, etc.)
                                 if (data.feedback || data.extended_feedback) {
                                     if (data.feedback) {
-                                        output += '{{ _("Details:") }} ' + data.feedback + '\n';
+                                        html += escHtml('{{ _("Details:") }} ') + data.feedback + '\n';
                                     }
                                     if (data.extended_feedback) {
-                                        output += data.extended_feedback + '\n';
+                                        html += data.extended_feedback + '\n';
                                     }
                                 }
 
                                 if (data.time !== null && data.time !== undefined) {
-                                    output += '{{ _("Time:") }} ' + data.time.toFixed(3) + 's\n';
+                                    html += escHtml('{{ _("Time:") }} ' + data.time.toFixed(3) + 's') + '\n';
                                 }
                                 if (data.memory !== null && data.memory !== undefined) {
-                                    output += '{{ _("Memory:") }} ' + data.memory.toFixed(0) + ' KB\n';
+                                    html += escHtml('{{ _("Memory:") }} ' + data.memory.toFixed(0) + ' KB') + '\n';
                                 }
-                                output += '\n{{ _("Output:") }}\n';
-                                output += data.output || '{{ _("(no output)") }}';
+                                html += '\n' + escHtml('{{ _("Output:") }}') + '\n';
+                                html += data.output || escHtml('{{ _("(no output)") }}');
                             }
 
-                            outputDisplay.setValue(output, -1);
-                            outputDisplay.gotoLine(1);
+                            setOutputHtml(html);
                         } else {
                             // Still processing
                             var statusText = '';
@@ -204,7 +218,7 @@
                             } else if (data.status === 'G') {
                                 statusText = '{{ _("Grading...") }}';
                             }
-                            outputDisplay.setValue(statusText, -1);
+                            setOutputText(statusText);
                         }
                     })
                     .fail(function(xhr) {
@@ -216,7 +230,7 @@
                         } else {
                             error += '{{ _("Failed to retrieve submission status") }}';
                         }
-                        outputDisplay.setValue(error, -1);
+                        setOutputText(error);
                     });
             }
 
@@ -244,7 +258,6 @@
 
                 codeEditor.resize();
                 inputEditor.resize();
-                outputDisplay.resize();
             }
 
             $(window).resize(resizeEditors);
@@ -363,6 +376,26 @@
             height: 100%;
         }
 
+        /* Output panel — plain <pre> that renders ansi2html-colored output */
+        #output-display {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 8px;
+            overflow: auto;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            font-family: Menlo, Consolas, 'Source Code Pro', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            background: #f8f9fa;
+            color: #212529;
+        }
+
+        #output-display:focus {
+            outline: 2px solid #4a90e2;
+            outline-offset: -2px;
+        }
+
         /* Dark mode support */
         @media (prefers-color-scheme: dark) {
             .ide-header {
@@ -383,6 +416,11 @@
 
             .rate-limit-info {
                 color: #a0aec0;
+            }
+
+            #output-display {
+                background: #1d1f21;
+                color: #c5c8c6;
             }
         }
 
@@ -451,7 +489,7 @@
             <div class="editor-panel">
                 <div class="editor-header">{{ _('Output') }}</div>
                 <div class="editor-content">
-                    <div id="output-display"></div>
+                    <pre id="output-display" tabindex="0"></pre>
                 </div>
             </div>
         </div>
