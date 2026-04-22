@@ -129,7 +129,7 @@
                     $('#problem-table').tablesorter({
                         headers: {
                             0: {
-                                sorter: 'solvedsort'
+                                sorter: false
                             }
                         },
                         textExtraction: function (node) {
@@ -183,7 +183,7 @@
                 <tr>
                     {% if request.in_contest %}
                         {% if request.user.is_authenticated %}
-                            <th class="solved"><i class="fa fa-check"></i></th>
+                            <th class="score">{{ _('Score') }}</th>
                         {% endif %}
                         <th class="problem">{{ _('Problem') }}</th>
                         <th class="category">{{ _('Category') }}</th>
@@ -232,34 +232,38 @@
                 {% for problem in problems %}
                     <tr>
                         {% if request.user.is_authenticated %}
-                            {% if problem.id in completed_problem_ids %}
-                                <td solved="1">
-                                    <a href="{{ url('user_submissions', problem.code, request.user.username) }}">
-                                        {% if problem.is_public or request.in_contest %}
-                                            <i class="solved-problem-color fa fa-check-circle"></i>
-                                        {% else %}
-                                            <i class="solved-problem-color fa fa-lock"></i>
-                                        {% endif %}
-                                    </a>
-                                </td>
-                            {% elif problem.id in attempted_problems %}
-                                <td solved="0">
-                                    <a href="{{ url('user_submissions', problem.code, request.user.username) }}">
-                                        {% if problem.is_public or request.in_contest %}
-                                            <i class="attempted-problem-color fa fa-minus-circle"></i>
-                                        {% else %}
-                                            <i class="attempted-problem-color fa fa-lock"></i>
-                                        {% endif %}
-                                    </a>
-                                </td>
+                            {% if request.in_contest %}
+                                {{ problem.user_problem_cell }}
                             {% else %}
-                                <td solved="-1">
-                                    {% if problem.is_public or request.in_contest %}
-                                        <i class="unsolved-problem-color fa fa-minus-circle"></i>
-                                    {% else %}
-                                        <i class="unsolved-problem-color fa fa-lock"></i>
-                                    {% endif %}
-                                </td>
+                                {% if problem.id in completed_problem_ids %}
+                                    <td solved="1">
+                                        <a href="{{ url('user_submissions', problem.code, request.user.username) }}">
+                                            {% if problem.is_public or request.in_contest %}
+                                                <i class="solved-problem-color fa fa-check-circle"></i>
+                                            {% else %}
+                                                <i class="solved-problem-color fa fa-lock"></i>
+                                            {% endif %}
+                                        </a>
+                                    </td>
+                                {% elif problem.id in attempted_problems %}
+                                    <td solved="0">
+                                        <a href="{{ url('user_submissions', problem.code, request.user.username) }}">
+                                            {% if problem.is_public or request.in_contest %}
+                                                <i class="attempted-problem-color fa fa-minus-circle"></i>
+                                            {% else %}
+                                                <i class="attempted-problem-color fa fa-lock"></i>
+                                            {% endif %}
+                                        </a>
+                                    </td>
+                                {% else %}
+                                    <td solved="-1">
+                                        {% if problem.is_public or request.in_contest %}
+                                            <i class="unsolved-problem-color fa fa-minus-circle"></i>
+                                        {% else %}
+                                            <i class="unsolved-problem-color fa fa-lock"></i>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
                             {% endif %}
                         {% endif %}
                         <td class="problem">
