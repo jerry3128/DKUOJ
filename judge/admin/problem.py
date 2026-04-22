@@ -266,7 +266,7 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         return form
 
     class Media:
-        js = ('admin_class_filter.js', 'admin_problem_code_autofill.js',)
+        js = ('admin_class_filter.js', 'admin_problem_code_autofill.js')
 
     def save_model(self, request, obj, form, change):
         # `organizations` and `classes` will not appear in `cleaned_data` if user cannot edit them

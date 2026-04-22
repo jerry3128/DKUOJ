@@ -344,7 +344,7 @@ class ContestAdmin(NoBatchDeleteMixin, SortableAdminBase, VersionAdmin):
         return form
 
     class Media:
-        js = ('admin_class_filter.js', 'admin_contest_key_autofill.js',)
+        js = ('admin_class_filter.js', 'admin_contest_key_autofill.js')
 
 
 class ContestParticipationForm(ModelForm):
