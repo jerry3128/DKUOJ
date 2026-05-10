@@ -119,6 +119,14 @@
     const submitBtn = document.getElementById('submit-btn');
     const formErrors = document.getElementById('form-errors');
     const resetSuggestionSpan = document.getElementById('reset-suggestion');
+    const currentUserId = "{{ request.user.id }}";
+
+    function autoFillCreator() {
+        const creatorInput = document.getElementById('id_creator');
+        if (!creatorInput) return;
+
+        creatorInput.value = currentUserId;
+    }
 
     const CHECK_KEY_URL = "{{ url('contest_check_key') }}";
 
@@ -249,6 +257,8 @@
 
     async function init() {
         try {
+            autoFillCreator();
+
             updateStatus(null, true, '🔄 {{ _("Generating unique key...") }}');
 
             const key = await generateUniqueContestKey();

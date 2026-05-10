@@ -110,6 +110,22 @@
         const submitBtn = document.getElementById('submit-btn');
         const formErrors = document.getElementById('form-errors');
         const resetSuggestionSpan = document.getElementById('reset-suggestion');
+        const currentUserId = "{{ request.user.id }}";
+        const currentUsername = "{{ request.user.username|escapejs }}";
+
+        function autoFillCreator() {
+            const creatorInput =
+                document.getElementById('id_creator') ||
+                document.querySelector('[name="creator"]');
+
+            if (!creatorInput) {
+                console.warn('creator field not found');
+                return;
+            }
+
+            creatorInput.value = currentUserId;
+            creatorInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
 
         let checkTimeout = null;
         let currentSuggestedCode = '';
@@ -244,6 +260,8 @@
 
         async function initialize() {
             try {
+                autoFillCreator();
+
                 updateStatus(null, true, '🔄 {{ _("Generating unique code...") }}');
 
                 const uniqueCode = await generateUniqueCloneCode();
