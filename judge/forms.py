@@ -10,7 +10,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db.models import Q
-from django.forms import BooleanField, CharField, ChoiceField, Form, ModelForm, MultipleChoiceField
+from django.forms import BooleanField, CharField, ChoiceField, Form, ModelForm, MultipleChoiceField, Textarea
 from django.urls import reverse_lazy
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _, ngettext_lazy
@@ -282,6 +282,29 @@ class TwoFactorLoginForm(TOTPForm):
                 raise ValidationError(_('Invalid scratch code.'))
         else:
             raise ValidationError(_('Must specify either totp_token or webauthn_response.'))
+
+
+class SimplifiedProblemCreateForm(Form):
+    PRESET_HOMEWORK = 'homework'
+    PRESET_EXAM = 'exam'
+    PRESET_CHOICES = (
+        (PRESET_HOMEWORK, _('Homework')),
+        (PRESET_EXAM, _('Exam problems')),
+    )
+
+    code = CharField(max_length=20, validators=[RegexValidator('^[a-z0-9]+$', _('Problem code must be ^[a-z0-9]+$'))])
+    name = CharField(max_length=100, label=_('Problem name'))
+    preset = ChoiceField(choices=PRESET_CHOICES, label=_('Preset'))
+    description = CharField(
+        label=_('Problem description'),
+        widget=Textarea(attrs={'rows': 18, 'placeholder': _('Write the problem statement here.')}),
+    )
+
+    def clean_code(self):
+        code = self.cleaned_data['code']
+        if Problem.objects.filter(code=code).exists():
+            raise ValidationError(_('Problem with code already exists.'))
+        return code
 
 
 class ProblemCloneForm(Form):

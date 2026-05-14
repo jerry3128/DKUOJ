@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block media %}
+    <style>
+        #problem-create-panel {
+            max-width: 900px;
+            margin: 2em auto;
+        }
+
+        #problem-create-panel .form-row {
+            margin-bottom: 1em;
+        }
+
+        #problem-create-panel label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.35em;
+        }
+
+        #problem-create-panel input[type="text"],
+        #problem-create-panel select,
+        #problem-create-panel textarea {
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        #problem-create-panel textarea {
+            min-height: 24em;
+        }
+
+        #problem-create-panel .help-text {
+            color: #666;
+            margin: 0.25em 0 0;
+        }
+
+        #problem-create-panel ul.errorlist {
+            color: #ba2121;
+            list-style-type: none;
+            margin: 0.25em 0;
+            padding-left: 0;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <form id="problem-create-panel" action="" method="post" class="form-area">
+        {% csrf_token %}
+        <h2>{{ _('Create a problem') }}</h2>
+        <p class="help-text">
+            {{ _('Use this simplified form to create a private problem from the homework or exam preset. You can edit advanced settings after creation.') }}
+        </p>
+
+        {% if form.non_field_errors() %}
+            <div id="form-errors">{{ form.non_field_errors() }}</div>
+        {% endif %}
+
+        <div class="form-row">
+            <label for="{{ form.code.id_for_label }}">{{ _('Problem code') }}</label>
+            {{ form.code.errors }}
+            {{ form.code }}
+            <p class="help-text">{{ _('Lowercase letters and numbers only; this becomes the problem URL.') }}</p>
+        </div>
+
+        <div class="form-row">
+            <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+            {{ form.name.errors }}
+            {{ form.name }}
+        </div>
+
+        <div class="form-row">
+            <label for="{{ form.preset.id_for_label }}">{{ form.preset.label }}</label>
+            {{ form.preset.errors }}
+            {{ form.preset }}
+        </div>
+
+        <div class="form-row">
+            <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+            {{ form.description.errors }}
+            {{ form.description }}
+        </div>
+
+        <hr>
+        <button style="float:right;" type="submit">{{ _('Create problem') }}</button>
+    </form>
+{% endblock %}

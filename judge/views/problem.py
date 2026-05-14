@@ -26,16 +26,17 @@ from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
-from django.views.generic import DetailView, ListView, View
+from django.views.generic import DetailView, FormView, ListView, View
 from django.views.generic.detail import SingleObjectMixin
 from reversion import revisions
 
 from judge.comments import CommentedDetailView
-from judge.forms import ProblemCloneForm, ProblemPointsVoteForm, ProblemSubmitForm
+from judge.forms import ProblemCloneForm, ProblemPointsVoteForm, ProblemSubmitForm, SimplifiedProblemCreateForm
 from judge.models import (
     ContestProblem,
     ContestSubmission,
     Judge,
+    LanguageLimit,
     Language,
     Organization,
     Problem,
@@ -995,6 +996,116 @@ class ProblemSubmit(LoginRequiredMixin, ProblemMixin, TitleMixin, SingleObjectFo
             self.old_submission = None
 
         return super().dispatch(request, *args, **kwargs)
+
+
+class SimplifiedProblemCreate(LoginRequiredMixin, PermissionRequiredMixin, TitleMixin, FormView):
+    title = gettext_lazy('Create Problem')
+    template_name = 'problem/create.html'
+    form_class = SimplifiedProblemCreateForm
+    permission_required = 'judge.add_problem'
+
+    PRESET_TEMPLATE_CODES = {
+        SimplifiedProblemCreateForm.PRESET_HOMEWORK: 'homework',
+        SimplifiedProblemCreateForm.PRESET_EXAM: 'exam',
+    }
+
+    def form_valid(self, form):
+        preset = form.cleaned_data['preset']
+        template_code = self.PRESET_TEMPLATE_CODES[preset]
+        template_problem = Problem.objects.filter(code=template_code).first()
+
+        with revisions.create_revision(atomic=True):
+            if template_problem is not None:
+                problem = self._create_from_template(template_problem, form)
+                revisions.set_comment(_('Created problem from %s preset') % template_code)
+            else:
+                problem = self._create_from_builtin_preset(form)
+                revisions.set_comment(_('Created problem from built-in %s preset') % preset)
+
+            revisions.set_user(self.request.user)
+
+        messages.success(self.request, _('Problem %(code)s was created.') % {'code': problem.code})
+        return HttpResponseRedirect(reverse('admin:judge_problem_change', args=(problem.id,)))
+
+    def _create_from_template(self, template_problem, form):
+        languages = list(template_problem.allowed_languages.all())
+        language_limits = list(template_problem.language_limits.all())
+        organizations = list(template_problem.organizations.all())
+        classes = list(template_problem.classes.all())
+        types = list(template_problem.types.all())
+        old_problem_id = template_problem.id
+        test_cases = list(ProblemTestCase.objects.filter(dataset_id=old_problem_id).order_by('order'))
+        templates = list(ProblemTemplate.objects.filter(problem_id=old_problem_id))
+        harnesses = list(ProblemHarness.objects.filter(problem_id=old_problem_id))
+
+        old_code = template_problem.code
+        new_code = form.cleaned_data['code']
+        problem = template_problem
+        problem.pk = None
+        problem.code = new_code
+        problem.name = form.cleaned_data['name']
+        problem.description = form.cleaned_data['description']
+        problem.is_public = False
+        problem.ac_rate = 0
+        problem.user_count = 0
+        problem.save()
+        problem.authors.set([self.request.profile])
+        problem.allowed_languages.set(languages)
+        self._clone_language_limits(language_limits, problem)
+        problem.organizations.set(organizations)
+        problem.classes.set(classes)
+        problem.types.set(types)
+
+        try:
+            original_problem_data = ProblemData.objects.get(problem_id=old_problem_id)
+        except ProblemData.DoesNotExist:
+            original_problem_data = None
+
+        cloner = ProblemClone()
+        if original_problem_data is not None:
+            cloner._clone_problem_data(original_problem_data, problem, old_code, new_code)
+        cloner._clone_test_cases(test_cases, problem)
+        cloner._clone_templates(templates, problem)
+        cloner._clone_harnesses(harnesses, problem)
+        cloner._copy_init_yml(old_code, new_code)
+        return problem
+
+    def _clone_language_limits(self, language_limits, new_problem):
+        LanguageLimit.objects.bulk_create([
+            LanguageLimit(
+                problem=new_problem,
+                language=limit.language,
+                time_limit=limit.time_limit,
+                memory_limit=limit.memory_limit,
+            ) for limit in language_limits
+        ])
+
+    def _create_from_builtin_preset(self, form):
+        preset = form.cleaned_data['preset']
+        if preset == SimplifiedProblemCreateForm.PRESET_HOMEWORK:
+            group_name, group_full_name = 'homework', _('Homework')
+            type_name, type_full_name = 'homework', _('Homework')
+        else:
+            group_name, group_full_name = 'exam', _('Exam Problems')
+            type_name, type_full_name = 'exam', _('Exam Problems')
+
+        group, _ = ProblemGroup.objects.get_or_create(name=group_name, defaults={'full_name': group_full_name})
+        problem_type, _ = ProblemType.objects.get_or_create(name=type_name, defaults={'full_name': type_full_name})
+        problem = Problem.objects.create(
+            code=form.cleaned_data['code'],
+            name=form.cleaned_data['name'],
+            description=form.cleaned_data['description'],
+            group=group,
+            time_limit=1,
+            memory_limit=262144,
+            points=100,
+            is_public=False,
+            is_manually_managed=True,
+        )
+        problem.authors.add(self.request.profile)
+        problem.types.add(problem_type)
+        problem.allowed_languages.set(Language.objects.all())
+        return problem
 
 
 class ProblemClone(ProblemMixin, PermissionRequiredMixin, TitleMixin, SingleObjectFormView):

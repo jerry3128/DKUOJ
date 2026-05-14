@@ -162,6 +162,14 @@
             <div id="content-right" class="problems">
                 <div class="info-float">
                     {% include "problem/search-form.html" %}
+                    {% if perms.judge.add_problem %}
+                        <div class="sidebox">
+                            <h3>{{ _('Create problem') }} <i class="fa fa-plus-circle"></i></h3>
+                            <div class="sidebox-content">
+                                <a href="{{ url('problem_create') }}">{{ _('Simplified problem create') }}</a>
+                            </div>
+                        </div>
+                    {% endif %}
                     {% if hot_problems %}
                         <div class="sidebox">
                             <h3>{{ _('Hot problems') }} <i class="fa fa-fire"></i></h3>

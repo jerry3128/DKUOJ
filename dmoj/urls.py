@@ -103,6 +103,7 @@ urlpatterns = [
 
     path('problems/', problem.ProblemList.as_view(), name='problem_list'),
     path('problems/random/', problem.RandomProblem.as_view(), name='problem_random'),
+    path('problem/create', problem.SimplifiedProblemCreate.as_view(), name='problem_create'),
 
     path('problem/<str:problem>', include([
         path('', problem.ProblemDetail.as_view(), name='problem_detail'),
