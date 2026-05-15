@@ -1,3 +1,4 @@
+from ansi2html import Ansi2HTMLConverter
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.cache import cache
@@ -25,6 +26,14 @@ IDE_RATE_LIMIT_WINDOW = 1  # minutes
 IDE_TIME_LIMIT = 2.0  # seconds
 IDE_MEMORY_LIMIT = 65536  # KB (64 MB)
 IDE_OUTPUT_LIMIT = 10240  # bytes (10 KB)
+
+_ansi_converter = Ansi2HTMLConverter(inline=True)
+
+
+def _ansi_to_html(text):
+    if not text:
+        return ''
+    return _ansi_converter.convert(text, full=False)
 
 
 class IDEView(LoginRequiredMixin, TitleMixin, TemplateView):
@@ -79,9 +88,10 @@ class IDESubmitView(LoginRequiredMixin, View):
                 'error': 'Input must be at most 65536 characters.',
             }, status=400)
 
-        try:
-            language = Language.objects.get(id=language_id, judges__online=True)
-        except Language.DoesNotExist:
+        language = Language.objects.filter(
+            id=language_id, judges__online=True,
+        ).distinct().first()
+        if language is None:
             return JsonResponse({
                 'error': 'Invalid or unavailable language.',
             }, status=400)
@@ -154,11 +164,14 @@ class IDESubmissionStatus(LoginRequiredMixin, View):
         if submission_obj.problem.code != IDE_PROBLEM_CODE:
             return JsonResponse({'error': 'Not an IDE submission.'}, status=400)
 
-        # Build response
+        # Build response. Text fields that may carry ANSI escape codes from
+        # compiler/interpreter output are converted to HTML here; the frontend
+        # inserts them as-is. Keep truncation on pre-conversion text to avoid
+        # slicing inside an HTML tag.
         response = {
             'status': submission_obj.status,
             'result': submission_obj.result,
-            'error': submission_obj.error,
+            'error': _ansi_to_html(submission_obj.error),
             'time': submission_obj.time,
             'memory': submission_obj.memory,
         }
@@ -175,11 +188,11 @@ class IDESubmissionStatus(LoginRequiredMixin, View):
                 if len(output) > IDE_OUTPUT_LIMIT:
                     output = output[:IDE_OUTPUT_LIMIT] + '\n\n[Output truncated to 10KB]'
 
-                response['output'] = output
+                response['output'] = _ansi_to_html(output)
                 response['test_case_status'] = test_case.status
                 response['test_case_time'] = test_case.time
                 response['test_case_memory'] = test_case.memory
-                response['feedback'] = test_case.feedback or ''
-                response['extended_feedback'] = test_case.extended_feedback or ''
+                response['feedback'] = _ansi_to_html(test_case.feedback)
+                response['extended_feedback'] = _ansi_to_html(test_case.extended_feedback)
 
         return JsonResponse(response)

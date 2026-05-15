@@ -658,7 +658,7 @@
     {% endif %}
     {% endif %}
 
-    <form id="problem_submit" action="{{ url('problem_submit', problem.code) }}" method="post" class="form-area">
+    <form id="problem_submit" action="{{ url('problem_submit', problem.code) }}" method="post" target="_blank" class="form-area">
         {% csrf_token %}
         {{ form.non_field_errors() }}
         <div id="submit-wrapper">
