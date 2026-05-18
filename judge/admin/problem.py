@@ -12,8 +12,9 @@ from django.utils.html import format_html
 from django.utils.translation import gettext, gettext_lazy as _, ngettext
 from reversion.admin import VersionAdmin
 
-from judge.models import Class, LanguageLimit, Problem, ProblemClarification, ProblemGroup, ProblemPointsVote, \
-    ProblemTemplate, ProblemTranslation, ProblemType, Profile, Solution, SubmissionSourceAccess
+from judge.models import Class, Language, LanguageLimit, Problem, ProblemClarification, ProblemGroup, \
+    ProblemPointsVote, ProblemTemplate, ProblemTranslation, ProblemType, Profile, Solution, \
+    SubmissionSourceAccess
 from judge.utils.views import NoBatchDeleteMixin
 from judge.widgets import AdminHeavySelect2MultipleWidget, AdminMartorWidget, AdminSelect2MultipleWidget, \
     AdminSelect2Widget, CheckboxSelectMultipleWithSelectAll
