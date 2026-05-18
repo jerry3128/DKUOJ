@@ -20,3 +20,7 @@ bridge_logs
 *.png
 *.jpg
 node_modules
+
+.agents
+.codex
+*__pycache__

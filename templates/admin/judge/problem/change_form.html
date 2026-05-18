@@ -12,6 +12,18 @@
     </script>
 {% endblock extrahead %}
 
+{% block form_top %}
+    {{ block.super }}
+    {% if is_advanced_add %}
+        <input type="hidden" name="_advanced_mode" value="1">
+    {% endif %}
+    {% if show_advanced_add_button %}
+        <div style="margin-bottom: 16px;">
+            <a class="button" href="{{ advanced_add_url }}">{{ _('Advanced') }}</a>
+        </div>
+    {% endif %}
+{% endblock %}
+
 {% block after_field_sets %}{{ block.super }}
     {% if original %}
         <a style="display: none" title="{{ _('View submissions') }}" class="button submissions-link"
