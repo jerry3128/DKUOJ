@@ -516,10 +516,12 @@ class ProblemList(QueryStringSortMixin, TitleMixin, SolvedProblemMixin, ListView
         return self.request.profile
 
     def get_contest_queryset(self):
+        participation = self.profile.current_contest
+        contest = participation.contest
+
         queryset = (
-            self.profile.current_contest.contest.contest_problems.select_related('problem__group')
+            contest.contest_problems.select_related('problem__group')
             .defer('problem__description')
-            .order_by('problem__code')
             .annotate(user_count=Count('submission__participation', distinct=True))
             .annotate(
                 i18n_translation=FilteredRelation(
@@ -536,28 +538,27 @@ class ProblemList(QueryStringSortMixin, TitleMixin, SolvedProblemMixin, ListView
             )
             .order_by('order')
         )
-        return [
-            {
-                'id': p['problem_id'],
-                'code': p['problem__code'],
-                'name': p['problem__name'],
-                'i18n_name': p['i18n_name'],
-                'group': {'full_name': p['problem__group__full_name']},
-                'points': p['points'],
-                'partial': p['partial'],
-                'user_count': p['user_count'],
-            }
-            for p in queryset.values(
-                'problem_id',
-                'problem__code',
-                'problem__name',
-                'i18n_name',
-                'problem__group__full_name',
-                'points',
-                'partial',
-                'user_count',
-            )
-        ]
+
+        result = []
+        for cp in queryset:
+            try:
+                user_problem_cell = contest.format.display_user_problem(participation, cp)
+            except (KeyError, TypeError, ValueError):
+                user_problem_cell = mark_safe('<td>???</td>')
+
+            result.append({
+                'id': cp.problem_id,
+                'code': cp.problem.code,
+                'name': cp.problem.name,
+                'i18n_name': cp.i18n_name,
+                'group': {'full_name': cp.problem.group.full_name},
+                'points': cp.points,
+                'partial': cp.partial,
+                'user_count': cp.user_count,
+                'user_problem_cell': user_problem_cell,
+            })
+
+        return result
 
     @staticmethod
     def apply_full_text(queryset, query):
