@@ -780,6 +780,23 @@ class LanguageTemplateAjax(View):
         return resp
 
 
+class ProblemCodeCheckView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        if not (
+            request.user.has_perm('judge.clone_problem')
+            or request.user.is_superuser
+            or getattr(request.user.profile, 'is_instructor', False)
+        ):
+            return JsonResponse({'error': _('Forbidden')}, status=403)
+
+        code = request.GET.get('code', '').strip()
+        if not code:
+            return JsonResponse({'error': _('Missing code')}, status=400)
+
+        exists = Problem.objects.filter(code=code).exists()
+        return JsonResponse({'exists': exists})
+
+
 class RandomProblem(ProblemList):
     def get(self, request, *args, **kwargs):
         self.setup_problem_list(request)

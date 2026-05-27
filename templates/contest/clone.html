@@ -1,42 +1,298 @@
 {% extends "base.html" %}
 
 {% block media %}
-    <style>
-        #contest-clone-panel {
-            position: relative;
-            margin: 5em auto auto -10em;
-            top: 40%;
-            left: 50%;
-        }
+<style>
+    #contest-clone-panel {
+        position: relative;
+        margin: 5em auto auto -10em;
+        top: 40%;
+        left: 50%;
+    }
 
-        #contest-key-container {
-            margin: 0.5em 0;
-        }
+    #contest-key-container {
+        margin: 0.5em 0;
+    }
 
-        #id_key {
-            width: 100%;
-        }
+    #id_key {
+        width: 100%;
+    }
 
-        ul.errorlist {
-            list-style-type: none;
-            padding-left: 0;
-            text-align: center;
-        }
-    </style>
+    ul.errorlist {
+        list-style-type: none;
+        padding-left: 0;
+        text-align: center;
+    }
+
+    .status-available {
+        color: #4CAF50;
+        font-size: 12px;
+        margin-top: 5px;
+    }
+
+    .status-unavailable {
+        color: #f44336;
+        font-size: 12px;
+        margin-top: 5px;
+    }
+
+    .status-checking {
+        color: #ff9800;
+        font-size: 12px;
+        margin-top: 5px;
+    }
+
+    input.valid {
+        border-color: #4CAF50 !important;
+        background-color: #f0fff0 !important;
+    }
+
+    input.invalid {
+        border-color: #f44336 !important;
+        background-color: #fff0f0 !important;
+    }
+
+    input.checking {
+        border-color: #ff9800 !important;
+        background-color: #fff8e1 !important;
+    }
+
+    .suggestion-hint {
+        font-size: 11px;
+        color: #666;
+        margin-top: 5px;
+        text-align: right;
+    }
+
+    .reset-suggestion {
+        cursor: pointer;
+        color: #2196F3;
+        font-size: 11px;
+        margin-left: 10px;
+        text-decoration: underline;
+    }
+
+    .reset-suggestion:hover {
+        color: #0b7dda;
+    }
+</style>
 {% endblock %}
 
 {% block body %}
-    <form id="contest-clone-panel" action="" method="post" class="form-area">
-        {% csrf_token %}
-        {% if form.errors %}
-            <div id="form-errors">
-                {{ form.key.errors }}
-            </div>
-        {% endif %}
+<form id="contest-clone-panel" action="" method="post" class="form-area">
+    {% csrf_token %}
 
-        <div><label class="inline-header grayed">{{ _('Enter a new key for the cloned contest:') }}</label></div>
-        <div id="contest-key-container"><span class="fullwidth">{{ form.key }}</span></div>
-        <hr>
-        <button style="float: right;" type="submit">{{ _('Clone!') }}</button>
-    </form>
+    <div id="form-errors" style="display:none;" class="errorlist"></div>
+
+    {% if form.errors %}
+        <div id="form-errors-old">
+            {{ form.key.errors }}
+        </div>
+    {% endif %}
+
+    <div>
+        <label class="inline-header grayed">
+            {{ _('Enter a new key for the cloned contest:') }}
+        </label>
+    </div>
+
+    <div id="contest-key-container">
+        <span class="fullwidth">{{ form.key }}</span>
+        <div id="key-status"></div>
+
+        <div class="suggestion-hint">
+            💡 {{ _('Auto-generated key (you can modify it)') }}
+            <span id="reset-suggestion" class="reset-suggestion" style="display:none;">
+                ↺ {{ _('Reset to suggested') }}
+            </span>
+        </div>
+    </div>
+
+    <hr>
+    <button style="float:right;" type="submit" id="submit-btn">
+        {{ _('Clone!') }}
+    </button>
+</form>
+
+<script>
+    const keyInput = document.getElementById('id_key');
+    const statusDiv = document.getElementById('key-status');
+    const submitBtn = document.getElementById('submit-btn');
+    const formErrors = document.getElementById('form-errors');
+    const resetSuggestionSpan = document.getElementById('reset-suggestion');
+    const currentUserId = "{{ request.user.id }}";
+
+    function autoFillCreator() {
+        const creatorInput = document.getElementById('id_creator');
+        if (!creatorInput) return;
+
+        creatorInput.value = currentUserId;
+    }
+
+    const CHECK_KEY_URL = "{{ url('contest_check_key') }}";
+
+    let checkTimeout = null;
+    let currentSuggestedKey = '';
+    let userModified = false;
+
+    async function checkContestKey(key) {
+        if (!key || key.trim() === '') return null;
+
+        try {
+            const response = await fetch(`${CHECK_KEY_URL}?key=${encodeURIComponent(key)}`, {
+                method: 'GET',
+                cache: 'no-cache',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            if (!response.ok) return null;
+
+            const data = await response.json();
+            return data.exists;
+        } catch (e) {
+            console.error(e);
+            return null;
+        }
+    }
+
+    async function generateUniqueContestKey() {
+        const max = 1000000;
+
+        for (let i = 0; i < max; i++) {
+            const key = `c${i.toString().padStart(6, '0')}`;
+            const exists = await checkContestKey(key);
+
+            if (exists === false) return key;
+
+            if (exists === null) {
+                throw new Error('check failed');
+            }
+        }
+
+        const timestamp = Date.now().toString().slice(-6);
+        return `contest${timestamp}`;
+    }
+
+    function updateStatus(exists, isChecking = false, custom = null) {
+        if (custom) {
+            statusDiv.innerHTML = custom;
+            statusDiv.className = '';
+            return;
+        }
+
+        if (isChecking) {
+            statusDiv.innerHTML = '⏳ {{ _("Checking availability...") }}';
+            statusDiv.className = 'status-checking';
+            keyInput.classList.add('checking');
+            keyInput.classList.remove('valid', 'invalid');
+            submitBtn.disabled = true;
+            return;
+        }
+
+        if (exists === null) {
+            statusDiv.innerHTML = '❓ {{ _("Unable to check") }}';
+            keyInput.classList.remove('valid', 'invalid', 'checking');
+            submitBtn.disabled = false;
+            return;
+        }
+
+        if (exists) {
+            statusDiv.innerHTML = '❌ {{ _("This key is already taken!") }}';
+            statusDiv.className = 'status-unavailable';
+            keyInput.classList.add('invalid');
+            keyInput.classList.remove('valid', 'checking');
+            submitBtn.disabled = true;
+
+            formErrors.innerHTML = '{{ _("This contest key already exists.") }}';
+            formErrors.style.display = 'block';
+        } else {
+            statusDiv.innerHTML = '✅ {{ _("Available!") }}';
+            statusDiv.className = 'status-available';
+            keyInput.classList.add('valid');
+            keyInput.classList.remove('invalid', 'checking');
+            submitBtn.disabled = false;
+            formErrors.style.display = 'none';
+        }
+    }
+
+    function onInput() {
+        const key = keyInput.value.trim();
+
+        if (key !== currentSuggestedKey) {
+            userModified = true;
+            resetSuggestionSpan.style.display = 'inline';
+        } else {
+            userModified = false;
+            resetSuggestionSpan.style.display = 'none';
+        }
+
+        if (checkTimeout) clearTimeout(checkTimeout);
+
+        if (!key) {
+            updateStatus(null);
+            return;
+        }
+
+        updateStatus(null, true);
+
+        checkTimeout = setTimeout(async () => {
+            const exists = await checkContestKey(key);
+            updateStatus(exists);
+        }, 400);
+    }
+
+    async function resetSuggestion() {
+        updateStatus(null, true, '🔄 {{ _("Generating new key...") }}');
+
+        const key = await generateUniqueContestKey();
+        currentSuggestedKey = key;
+        keyInput.value = key;
+        userModified = false;
+        resetSuggestionSpan.style.display = 'none';
+
+        const exists = await checkContestKey(key);
+        updateStatus(exists);
+    }
+
+    async function init() {
+        try {
+            autoFillCreator();
+
+            updateStatus(null, true, '🔄 {{ _("Generating unique key...") }}');
+
+            const key = await generateUniqueContestKey();
+            currentSuggestedKey = key;
+            keyInput.value = key;
+
+            const exists = await checkContestKey(key);
+            updateStatus(exists);
+
+            keyInput.addEventListener('input', onInput);
+            resetSuggestionSpan.addEventListener('click', resetSuggestion);
+        } catch (e) {
+            updateStatus(null, false, '❌ {{ _("Failed to generate key") }}');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+
+    document.getElementById('contest-clone-panel').addEventListener('submit', async (e) => {
+        const key = keyInput.value.trim();
+
+        if (!key) {
+            e.preventDefault();
+            formErrors.innerHTML = '{{ _("Please enter a key.") }}';
+            formErrors.style.display = 'block';
+            return;
+        }
+
+        const exists = await checkContestKey(key);
+
+        if (exists) {
+            e.preventDefault();
+            updateStatus(true);
+        }
+    });
+</script>
 {% endblock %}
