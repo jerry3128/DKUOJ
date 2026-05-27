@@ -1,0 +1,777 @@
+{% extends "common-content.html" %}
+
+{% block title_ruler %}{% endblock %}
+
+{% block title_row %}
+    {% set tab = 'analytics' %}
+    {% set title = contest.name %}
+    {% include "contest/contest-tabs.html" %}
+{% endblock %}
+
+{% block content_media %}
+    <style>
+        .analytics-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .summary-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 12px 16px;
+            text-align: center;
+        }
+        .summary-card .value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+        .summary-card .label {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .analytics-table-container {
+            overflow-x: auto;
+            margin-bottom: 24px;
+        }
+        .analytics-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+        .analytics-table th {
+            background: #f0f0f0;
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 2px solid #ccc;
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+        }
+        .analytics-table th:hover {
+            background: #e0e0e0;
+        }
+        .analytics-table th .sort-arrow {
+            margin-left: 4px;
+            font-size: 0.8em;
+        }
+        .analytics-table td {
+            padding: 6px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .analytics-table tr:hover {
+            background: #f5f5f5;
+        }
+        .analytics-table tr.expandable {
+            cursor: pointer;
+        }
+
+        .cell-normal { }
+        .cell-notable {
+            background-color: #fff3cd;
+        }
+        .cell-outlier {
+            background-color: #f8d7da;
+        }
+
+        .anomaly-score {
+            font-weight: bold;
+        }
+        .anomaly-high {
+            color: #dc3545;
+        }
+        .anomaly-medium {
+            color: #fd7e14;
+        }
+        .anomaly-low {
+            color: #28a745;
+        }
+
+        .student-detail {
+            display: none;
+            padding: 16px;
+            background: #fafafa;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .student-detail.expanded {
+            display: table-row;
+        }
+        .student-detail td {
+            padding: 16px;
+        }
+        .detail-content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .detail-section {
+            flex: 1;
+            min-width: 250px;
+        }
+        .detail-section h4 {
+            margin: 0 0 8px 0;
+            font-size: 0.95em;
+            color: #555;
+        }
+        .detail-section .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 3px 0;
+            font-size: 0.85em;
+        }
+        .detail-section .metric .metric-label {
+            color: #666;
+        }
+
+        .chart-container {
+            margin: 24px 0;
+            position: relative;
+        }
+        .chart-container canvas {
+            width: 100% !important;
+        }
+
+        .student-timeline-chart {
+            margin-top: 12px;
+            max-height: 300px;
+        }
+
+        .outlier-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .outlier-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75em;
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .disclaimer {
+            background: #e2e3e5;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 0.85em;
+            color: #383d41;
+        }
+
+        .section-header {
+            margin: 24px 0 12px 0;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .toggle {
+            cursor: pointer;
+            user-select: none;
+        }
+        .toggle::before {
+            content: '\25B8\00A0';
+            display: inline-block;
+            width: 1em;
+        }
+        .toggle.open::before {
+            content: '\25BE\00A0';
+        }
+
+        .section-hint {
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .summary-card {
+                background: #1f1f1f;
+                border-color: #3b3b3b;
+            }
+            .summary-card .value { color: #eee; }
+            .summary-card .label { color: #aaa; }
+
+            .analytics-table th {
+                background: #2a2a2a;
+                border-bottom-color: #555;
+            }
+            .analytics-table th:hover { background: #333; }
+            .analytics-table td { border-bottom-color: #333; }
+            .analytics-table tr:hover { background: #2a2a2a; }
+
+            .cell-notable {
+                background-color: #5c4a00;
+                color: #fde68a;
+            }
+            .cell-outlier {
+                background-color: #5c1a1f;
+                color: #fca5a5;
+            }
+
+            .student-detail {
+                background: #1a1a1a;
+                border-bottom-color: #3b3b3b;
+            }
+            .detail-section h4 { color: #ccc; }
+            .detail-section .metric .metric-label { color: #aaa; }
+
+            .outlier-badge {
+                background: #5c1a1f;
+                color: #fca5a5;
+            }
+
+            .disclaimer {
+                background: #2a2a2a;
+                color: #ccc;
+            }
+
+            .section-header { border-bottom-color: #3b3b3b; }
+
+            .section-hint { color: #aaa; }
+        }
+    </style>
+{% endblock %}
+
+{% block content_js_media %}
+    <script type="text/javascript" src="{{ static('libs/chart.js/Chart.js') }}"></script>
+    {% include "contest/media-js.html" %}
+    <script type="text/javascript">
+        var timelineData = {{ timeline_json }};
+        var studentsData = {{ students_json }};
+        var problemAcRates = {{ problem_ac_rates_json }};
+        var classTimelineChart = null;
+
+        // Color mapping for submission results
+        var resultColors = {
+            'AC': '#28a745',
+            'WA': '#dc3545',
+            'TLE': '#6f42c1',
+            'MLE': '#e83e8c',
+            'CE': '#fd7e14',
+            'RTE': '#007bff',
+            'OLE': '#20c997',
+            'IR': '#6610f2',
+            'IE': '#343a40',
+            'SC': '#17a2b8',
+            'AB': '#6c757d'
+        };
+
+        // Friendly metric names
+        var metricNames = {
+            'attempt.first_try_ac_rate': 'First-Try AC%',
+            'attempt.avg_attempts_before_ac': 'Low Avg Attempts',
+            'attempt.no_progression_rate': 'No Progression%',
+            'timing.burst_count': 'Burst Solves',
+            'timing.spacing_variance': 'Low Spacing Variance',
+            'code.avg_comment_density': 'High Comment%',
+            'code.avg_source_length': 'Long Source Code',
+            'score_patterns.perfect_score_rate': 'Perfect Score%'
+        };
+
+        $(function() {
+            // Sortable table
+            var $table = $('#analytics-table');
+            var $tbody = $table.find('tbody');
+            var $headers = $table.find('th[data-sort]');
+            var currentSort = 'anomaly_score';
+            var currentDir = 'desc';
+
+            $headers.click(function() {
+                var sortKey = $(this).data('sort');
+                if (currentSort === sortKey) {
+                    currentDir = currentDir === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort = sortKey;
+                    currentDir = 'desc';
+                }
+
+                var $rows = $tbody.find('tr.student-row').get();
+                $rows.sort(function(a, b) {
+                    var aVal = parseFloat($(a).data(sortKey)) || 0;
+                    var bVal = parseFloat($(b).data(sortKey)) || 0;
+                    return currentDir === 'asc' ? aVal - bVal : bVal - aVal;
+                });
+
+                // Re-append rows with their detail rows
+                $.each($rows, function(idx, row) {
+                    var detailRow = $(row).next('.student-detail');
+                    $tbody.append(row);
+                    if (detailRow.length) {
+                        $tbody.append(detailRow);
+                    }
+                });
+
+                // Update sort arrows
+                $headers.find('.sort-arrow').text('');
+                $(this).find('.sort-arrow').text(currentDir === 'asc' ? '\u25B2' : '\u25BC');
+            });
+
+            // Expandable rows
+            $tbody.on('click', 'tr.student-row', function() {
+                var $detail = $(this).next('.student-detail');
+                $detail.toggleClass('expanded');
+
+                // Draw per-student timeline if not already drawn
+                var $canvas = $detail.find('.student-timeline-canvas');
+                if ($detail.hasClass('expanded') && !$canvas.data('drawn')) {
+                    var userId = $(this).data('userid');
+                    drawStudentTimeline($canvas[0], userId);
+                    $canvas.data('drawn', true);
+                }
+            });
+
+            // Draw class timeline chart
+            if (timelineData.submissions.length > 0) {
+                drawClassTimeline();
+            }
+
+            // Re-render timeline after collapse/expand: Chart.js v2 loses its sizing
+            // when its container is display:none'd by register_toggle's .hide(400).
+            var $timelineToggle = $('#class-timeline-canvas').closest('.toggled').prev('.toggle');
+            $timelineToggle.on('click', function () {
+                setTimeout(function () {
+                    if ($('#class-timeline-canvas').is(':visible') && timelineData.submissions.length > 0) {
+                        if (classTimelineChart) {
+                            classTimelineChart.destroy();
+                            classTimelineChart = null;
+                        }
+                        drawClassTimeline();
+                    }
+                }, 450);
+            });
+        });
+
+        function drawClassTimeline() {
+            var canvas = document.getElementById('class-timeline-canvas');
+            if (!canvas || !timelineData.start) return;
+            var ctx = canvas.getContext('2d');
+
+            var students = timelineData.students;
+            var startTime = new Date(timelineData.start).getTime();
+            var endTime = new Date(timelineData.deadline).getTime();
+
+            // Build datasets per result type
+            var dataByResult = {};
+            timelineData.submissions.forEach(function(sub) {
+                var result = sub.result || 'QU';
+                if (!dataByResult[result]) {
+                    dataByResult[result] = [];
+                }
+                var subTime = new Date(sub.date).getTime();
+                var xVal = (subTime - startTime) / (1000 * 3600);  // hours from start
+                var yVal = students.indexOf(sub.username);
+                if (yVal >= 0) {
+                    dataByResult[result].push({x: xVal, y: yVal});
+                }
+            });
+
+            var datasets = [];
+            Object.keys(dataByResult).forEach(function(result) {
+                datasets.push({
+                    label: result,
+                    data: dataByResult[result],
+                    backgroundColor: resultColors[result] || '#6c757d',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    showLine: false
+                });
+            });
+
+            canvas.height = Math.max(300, students.length * 20 + 80);
+            classTimelineChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {datasets: datasets},
+                options: {
+                    maintainAspectRatio: false,
+                    animation: false,
+                    scales: {
+                        xAxes: [{
+                            scaleLabel: {display: true, labelString: 'Hours from start'},
+                            ticks: {min: 0}
+                        }],
+                        yAxes: [{
+                            ticks: {
+                                min: -0.5,
+                                max: students.length - 0.5,
+                                stepSize: 1,
+                                callback: function(value) {
+                                    return students[value] || '';
+                                }
+                            }
+                        }]
+                    },
+                    tooltips: {
+                        callbacks: {
+                            label: function(item, data) {
+                                var ds = data.datasets[item.datasetIndex];
+                                var student = students[item.yLabel] || '?';
+                                return ds.label + ': ' + student + ' at ' + Math.round(item.xLabel * 10) / 10 + 'h';
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawStudentTimeline(canvas, userId) {
+            var ctx = canvas.getContext('2d');
+            if (!timelineData.start) return;
+
+            // Filter submissions for this user
+            var userSubs = timelineData.submissions.filter(function(s) { return s.user_id === userId; });
+            if (userSubs.length === 0) return;
+
+            var startTime = new Date(timelineData.start).getTime();
+
+            // Group by problem
+            var problems = [];
+            var problemSubs = {};
+            userSubs.forEach(function(sub) {
+                if (problems.indexOf(sub.problem_code) === -1) {
+                    problems.push(sub.problem_code);
+                    problemSubs[sub.problem_code] = [];
+                }
+                problemSubs[sub.problem_code].push(sub);
+            });
+
+            var datasets = [];
+            Object.keys(resultColors).forEach(function(result) {
+                var data = [];
+                userSubs.forEach(function(sub) {
+                    if ((sub.result || 'QU') === result) {
+                        var subTime = new Date(sub.date).getTime();
+                        var xVal = (subTime - startTime) / (1000 * 3600);
+                        var yVal = problems.indexOf(sub.problem_code);
+                        data.push({x: xVal, y: yVal});
+                    }
+                });
+                if (data.length > 0) {
+                    datasets.push({
+                        label: result,
+                        data: data,
+                        backgroundColor: resultColors[result],
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        showLine: false
+                    });
+                }
+            });
+
+            canvas.height = Math.max(150, problems.length * 30 + 60);
+            new Chart(ctx, {
+                type: 'scatter',
+                data: {datasets: datasets},
+                options: {
+                    maintainAspectRatio: false,
+                    animation: false,
+                    scales: {
+                        xAxes: [{
+                            scaleLabel: {display: true, labelString: 'Hours from start'},
+                            ticks: {min: 0}
+                        }],
+                        yAxes: [{
+                            ticks: {
+                                min: -0.5,
+                                max: problems.length - 0.5,
+                                stepSize: 1,
+                                callback: function(value) {
+                                    return problems[value] || '';
+                                }
+                            }
+                        }]
+                    },
+                    tooltips: {
+                        callbacks: {
+                            label: function(item, data) {
+                                var ds = data.datasets[item.datasetIndex];
+                                var prob = problems[Math.round(item.yLabel)] || '?';
+                                return ds.label + ': ' + prob + ' at ' + Math.round(item.xLabel * 10) / 10 + 'h';
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+{% endblock %}
+
+{% block body %}
+    <div class="disclaimer">
+        <strong>{{ _('Note:') }}</strong>
+        {{ _('This page highlights unusual submission patterns for further investigation. It does not determine whether cheating has occurred. Use professional judgment when interpreting these metrics.') }}
+    </div>
+
+    {# Summary Statistics #}
+    <h3 class="section-header">{{ _('Contest Summary') }}</h3>
+    <div class="analytics-summary">
+        <div class="summary-card">
+            <div class="value">{{ analytics_summary.total_students }}</div>
+            <div class="label">{{ _('Total Students') }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ analytics_summary.total_submissions }}</div>
+            <div class="label">{{ _('Total Submissions') }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ analytics_summary.highest_score }}</div>
+            <div class="label">{{ _('Highest Score') }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ analytics_summary.lowest_score }}</div>
+            <div class="label">{{ _('Lowest Score') }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ analytics_summary.mean_score }}</div>
+            <div class="label">{{ _('Mean Score') }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ analytics_summary.median_score }}</div>
+            <div class="label">{{ _('Median Score') }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ analytics_summary.score_std_dev }}</div>
+            <div class="label">{{ _('Score Std Dev') }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ analytics_summary.avg_problems_solved }}</div>
+            <div class="label">{{ _('Avg Problems Solved') }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ analytics_summary.total_ac_rate }}%</div>
+            <div class="label">{{ _('Overall AC Rate') }}</div>
+        </div>
+        <div class="summary-card">
+            <div class="value">{{ analytics_summary.avg_submissions_per_student }}</div>
+            <div class="label">{{ _('Avg Submissions/Student') }}</div>
+        </div>
+    </div>
+
+    {# Student Overview Table #}
+    <h3 class="section-header toggle open">{{ _('Student Behavior Overview') }}</h3>
+    <div class="toggled">
+    <p class="section-hint">
+        {{ _('Click column headers to sort. Click a student row to see their submission timeline.') }}
+    </p>
+    <div class="analytics-table-container">
+        <table class="analytics-table" id="analytics-table">
+            <thead>
+                <tr>
+                    <th data-sort="username">{{ _('Student') }} <span class="sort-arrow"></span></th>
+                    <th data-sort="score">{{ _('Score') }} <span class="sort-arrow"></span></th>
+                    <th data-sort="problems_solved">{{ _('Solved') }} <span class="sort-arrow"></span></th>
+                    <th data-sort="total_submissions">{{ _('Submissions') }} <span class="sort-arrow"></span></th>
+                    <th data-sort="first_try_ac_rate">{{ _('1st-Try AC%%') }} <span class="sort-arrow"></span></th>
+                    <th data-sort="avg_attempts">{{ _('Avg Attempts') }} <span class="sort-arrow"></span></th>
+                    <th data-sort="comment_density">{{ _('Comment%%') }} <span class="sort-arrow"></span></th>
+                    <th data-sort="avg_source_length">{{ _('Avg Code Len') }} <span class="sort-arrow"></span></th>
+                    <th data-sort="anomaly_score">{{ _('Anomaly') }} <span class="sort-arrow">&#9660;</span></th>
+                    <th>{{ _('Flags') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students_list %}
+                <tr class="student-row expandable"
+                    data-userid="{{ student.user_id }}"
+                    data-username="{{ student.username }}"
+                    data-score="{{ student.score }}"
+                    data-problems_solved="{{ student.problems_solved }}"
+                    data-total_submissions="{{ student.total_submissions }}"
+                    data-first_try_ac_rate="{{ student.attempt.first_try_ac_rate }}"
+                    data-avg_attempts="{{ student.attempt.avg_attempts_before_ac }}"
+                    data-comment_density="{{ student.code.avg_comment_density }}"
+                    data-avg_source_length="{{ student.code.avg_source_length }}"
+                    data-anomaly_score="{{ student.anomaly_score }}">
+                    <td><strong><a href="{{ url('contest_all_user_submissions', contest.key, student.username) }}" target="_blank" rel="noopener" onclick="event.stopPropagation()">{{ student.username }}</a></strong></td>
+                    <td>{{ student.score }}</td>
+                    <td>{{ student.problems_solved }}</td>
+                    <td>{{ student.total_submissions }}</td>
+                    {% set ftac = student.attempt.first_try_ac_rate %}
+                    {% if class_stats.get('attempt.first_try_ac_rate') %}
+                        {% set cs = class_stats['attempt.first_try_ac_rate'] %}
+                        {% if cs.stdev > 0 %}
+                            {% set z = (ftac - cs.mean) / cs.stdev %}
+                            <td class="{% if z > 1.5 %}cell-outlier{% elif z > 1.0 %}cell-notable{% else %}cell-normal{% endif %}">
+                                {{ ftac }}%
+                            </td>
+                        {% else %}
+                            <td>{{ ftac }}%</td>
+                        {% endif %}
+                    {% else %}
+                        <td>{{ ftac }}%</td>
+                    {% endif %}
+                    <td>{{ student.attempt.avg_attempts_before_ac }}</td>
+                    {% set cd = student.code.avg_comment_density %}
+                    {% if class_stats.get('code.avg_comment_density') %}
+                        {% set cs = class_stats['code.avg_comment_density'] %}
+                        {% if cs.stdev > 0 %}
+                            {% set z = (cd - cs.mean) / cs.stdev %}
+                            <td class="{% if z > 1.5 %}cell-outlier{% elif z > 1.0 %}cell-notable{% else %}cell-normal{% endif %}">
+                                {{ cd }}%
+                            </td>
+                        {% else %}
+                            <td>{{ cd }}%</td>
+                        {% endif %}
+                    {% else %}
+                        <td>{{ cd }}%</td>
+                    {% endif %}
+                    <td>{{ student.code.avg_source_length|int }}</td>
+                    <td class="anomaly-score {% if student.anomaly_percentile >= 90 %}anomaly-high{% elif student.anomaly_percentile >= 70 %}anomaly-medium{% else %}anomaly-low{% endif %}">
+                        {{ student.anomaly_percentile|int }}th
+                    </td>
+                    <td>
+                        <div class="outlier-badges">
+                        {% for flag in student.outlier_metrics %}
+                            <span class="outlier-badge" title="z={{ flag.z_score }}">
+                                {{ flag.metric.split('.')[-1]|replace('_', ' ') }}
+                            </span>
+                        {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                <tr class="student-detail">
+                    <td colspan="10">
+                        <div class="detail-content">
+                            <div class="detail-section">
+                                <h4>{{ _('Attempt Patterns') }}</h4>
+                                <div class="metric">
+                                    <span class="metric-label">{{ _('First-Try AC Rate') }}</span>
+                                    <span>{{ student.attempt.first_try_ac_rate }}%</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">{{ _('Avg Attempts Before AC') }}</span>
+                                    <span>{{ student.attempt.avg_attempts_before_ac }}</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">{{ _('No-Progression Rate') }}</span>
+                                    <span>{{ student.attempt.no_progression_rate }}%</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">{{ _('Problems Attempted') }}</span>
+                                    <span>{{ student.attempt.problems_attempted }}</span>
+                                </div>
+                            </div>
+                            <div class="detail-section">
+                                <h4>{{ _('Timing Patterns') }}</h4>
+                                <div class="metric">
+                                    <span class="metric-label">{{ _('Avg Solve Time') }}</span>
+                                    <span>
+                                        {% if student.timing.avg_solve_time_seconds is not none %}
+                                            {% if student.timing.avg_solve_time_seconds < 60 %}
+                                                {{ student.timing.avg_solve_time_seconds|round(0)|int }}s
+                                            {% elif student.timing.avg_solve_time_seconds < 3600 %}
+                                                {{ (student.timing.avg_solve_time_seconds / 60)|round(1) }}m
+                                            {% else %}
+                                                {{ (student.timing.avg_solve_time_seconds / 3600)|round(1) }}h
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">{{ _('Burst Solves') }}</span>
+                                    <span>{{ student.timing.burst_count }}</span>
+                                </div>
+                            </div>
+                            <div class="detail-section">
+                                <h4>{{ _('Code Characteristics') }}</h4>
+                                <div class="metric">
+                                    <span class="metric-label">{{ _('Comment Density') }}</span>
+                                    <span>{{ student.code.avg_comment_density }}%</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">{{ _('Avg Source Length') }}</span>
+                                    <span>{{ student.code.avg_source_length|int }} chars</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">{{ _('Source Length Variance') }}</span>
+                                    <span>{{ student.code.source_length_variance|int }}</span>
+                                </div>
+                            </div>
+                            <div class="detail-section">
+                                <h4>{{ _('Score Patterns') }}</h4>
+                                <div class="metric">
+                                    <span class="metric-label">{{ _('Perfect Score Rate') }}</span>
+                                    <span>{{ student.score_patterns.perfect_score_rate }}%</span>
+                                </div>
+                                <div class="metric">
+                                    <span class="metric-label">{{ _('Difficulty Correlation') }}</span>
+                                    <span>
+                                        {% if student.score_patterns.difficulty_correlation is not none %}
+                                            {{ student.score_patterns.difficulty_correlation }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <h4 style="margin-top: 16px;">{{ _('Submission Timeline') }}</h4>
+                        <div class="student-timeline-chart">
+                            <canvas class="student-timeline-canvas" height="150"></canvas>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    </div>
+
+    {# Cross-Student Similarity #}
+    {% if similarity_sections %}
+        <h3 class="section-header toggle open">{{ _('Cross-Student Code Similarity') }}</h3>
+        <div class="toggled">
+            <p class="section-hint">
+                {{ _('Jaccard similarity of code identifiers between student pairs, per problem, after stripping tokens from the starter template. Only pairs above 0.5 are shown. High values warrant review but are not proof of misconduct.') }}
+            </p>
+            {% for section in similarity_sections %}
+                <h4 class="toggle closed" style="margin-top: 16px;">
+                    {{ section.problem_code }} &mdash; {{ section.problem_name }} ({{ section.pairs|length }} {{ _('pairs') }})
+                </h4>
+                <div class="toggled" style="display: none;">
+                    <div class="analytics-table-container">
+                        <table class="analytics-table">
+                            <thead>
+                                <tr>
+                                    <th>{{ _('Student A') }}</th>
+                                    <th>{{ _('Student B') }}</th>
+                                    <th>{{ _('Similarity') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for pair in section.pairs %}
+                                <tr>
+                                    <td><strong><a href="{{ url('contest_user_submissions', contest.key, pair.user1, section.problem_code) }}" target="_blank" rel="noopener">{{ pair.user1 }}</a></strong></td>
+                                    <td><strong><a href="{{ url('contest_user_submissions', contest.key, pair.user2, section.problem_code) }}" target="_blank" rel="noopener">{{ pair.user2 }}</a></strong></td>
+                                    <td class="{% if pair.similarity >= 0.8 %}cell-outlier{% else %}cell-notable{% endif %}">
+                                        {{ pair.similarity }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# Class Submission Timeline #}
+    {% if has_timeline_data %}
+        <h3 class="section-header toggle open">{{ _('Class Submission Timeline') }}</h3>
+        <div class="toggled">
+            <p class="section-hint">
+                {{ _('Each dot is a submission. Colors indicate result (green=AC, red=WA, etc.). X-axis shows hours from contest start.') }}
+            </p>
+            <div class="chart-container">
+                <canvas id="class-timeline-canvas"></canvas>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
