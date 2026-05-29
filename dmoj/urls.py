@@ -11,9 +11,9 @@ from django.views.generic import RedirectView
 
 from judge.feed import AtomBlogFeed, AtomCommentFeed, AtomProblemFeed, BlogFeed, CommentFeed, ProblemFeed
 from judge.sitemap import sitemaps
-from judge.views import TitledTemplateView, api, blog, comment, contests, ide, language, license, mailgun, \
-    organization, preview, problem, problem_manage, ranked_submission, register, stats, status, submission, tasks, \
-    ticket, two_factor, user, widgets
+from judge.views import TitledTemplateView, api, blog, comment, contest_analytics, contests, ide, language, license, \
+    mailgun, organization, preview, problem, problem_manage, ranked_submission, register, stats, status, submission, \
+    tasks, ticket, two_factor, user, widgets
 from judge.views.problem_data import ProblemDataView, ProblemSubmissionDiff, \
     download_test_case, download_tester, problem_data_file, problem_init_view
 from judge.views.register import ActivationView, RegistrationView
@@ -213,6 +213,7 @@ urlpatterns = [
         path('/join', contests.ContestJoin.as_view(), name='contest_join'),
         path('/leave', contests.ContestLeave.as_view(), name='contest_leave'),
         path('/stats', contests.ContestStats.as_view(), name='contest_stats'),
+        path('/analytics', contest_analytics.ContestAnalytics.as_view(), name='contest_analytics'),
 
         path('/rank/<str:problem>/',
              paged_list_view(ranked_submission.ContestRankedSubmission, 'contest_ranked_submissions')),
@@ -280,8 +281,10 @@ urlpatterns = [
 
     path('api/v2/', include([
         path('contests', api.api_v2.APIContestList.as_view()),
+        path('contest/check-key/', contests.ContestKeyCheckView.as_view(), name='contest_check_key'),
         path('contest/<str:contest>', api.api_v2.APIContestDetail.as_view()),
         path('problems', api.api_v2.APIProblemList.as_view()),
+        path('problem/check-code/', problem.ProblemCodeCheckView.as_view(), name='problem_check_code'),
         path('problem/<str:problem>', api.api_v2.APIProblemDetail.as_view()),
         path('users', api.api_v2.APIUserList.as_view()),
         path('user/<str:user>', api.api_v2.APIUserDetail.as_view()),

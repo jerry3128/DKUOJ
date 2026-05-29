@@ -15,7 +15,7 @@ from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.db import IntegrityError
 from django.db.models import BooleanField, Case, Count, F, FloatField, IntegerField, Max, Min, Q, Sum, Value, When
 from django.db.models.expressions import CombinedExpression, Exists, OuterRef
-from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.template.defaultfilters import date as date_filter
 from django.urls import reverse
@@ -315,6 +315,17 @@ class ContestDetail(ContestMixin, TitleMixin, CommentedDetailView):
         context['enable_comments'] = settings.DMOJ_ENABLE_COMMENTS
         context['enable_social'] = settings.DMOJ_ENABLE_SOCIAL
         return context
+
+
+class ContestKeyCheckView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        key = request.GET.get('key', '').strip()
+
+        if not key:
+            return JsonResponse({'error': 'missing key'}, status=400)
+
+        exists = Contest.objects.filter(key=key).exists()
+        return JsonResponse({'exists': exists})
 
 
 class ContestClone(ContestMixin, PermissionRequiredMixin, TitleMixin, SingleObjectFormView):

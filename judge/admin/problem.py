@@ -441,7 +441,7 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         return form
 
     class Media:
-        js = ('admin_class_filter.js',)
+        js = ('admin_class_filter.js', 'admin_problem_code_autofill.js')
 
     def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
         context['show_advanced_add_button'] = add and not self.is_advanced_add_mode(request, obj)
