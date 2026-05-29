@@ -9,9 +9,9 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.forms import ModelForm
 from django.urls import reverse, reverse_lazy
+from django.utils.html import format_html
 from django.utils import timezone
 from django.utils.text import slugify
-from django.utils.html import format_html
 from django.utils.translation import gettext, gettext_lazy as _, ngettext
 from reversion.admin import VersionAdmin
 
@@ -524,7 +524,11 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         return super().render_change_form(request, context, add, change, form_url, obj)
 
     def save_model(self, request, obj, form, change):
-        if not change and not self.is_advanced_add_mode(request, obj) and not self.is_embedded_advanced_mode(request, obj):
+        if (
+            not change and
+            not self.is_advanced_add_mode(request, obj) and
+            not self.is_embedded_advanced_mode(request, obj)
+        ):
             self.apply_creation_defaults(request, obj)
 
         # `organizations` and `classes` will not appear in `cleaned_data` if user cannot edit them
@@ -549,7 +553,11 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
-        if change or self.is_advanced_add_mode(request, form.instance) or self.is_embedded_advanced_mode(request, form.instance):
+        if (
+            change or
+            self.is_advanced_add_mode(request, form.instance) or
+            self.is_embedded_advanced_mode(request, form.instance)
+        ):
             return
 
         problem = form.instance
