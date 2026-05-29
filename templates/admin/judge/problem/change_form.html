@@ -124,14 +124,14 @@
                         }
                     }
                     if ($field.is(':checkbox')) {
-                        $field.prop('checked', !!value).trigger('change');
+                        $field.prop('checked', !!value).trigger('change').trigger('change.select2');
                         return;
                     }
                     if ($field.is('select[multiple]')) {
-                        $field.val((value || []).map(String)).trigger('change');
+                        $field.val((value || []).map(String)).trigger('change').trigger('change.select2');
                         return;
                     }
-                    $field.val(value == null ? '' : value).trigger('change');
+                    $field.val(value == null ? '' : value).trigger('change').trigger('change.select2');
                 }
 
                 function requestAutofillCode() {
@@ -140,6 +140,7 @@
                         if (autofillFn) {
                             return autofillFn().then(function (generatedCode) {
                                 presetDefaults.code = generatedCode || fallbackCode;
+                                setFieldValue('code', presetDefaults.code);
                                 return presetDefaults.code;
                             });
                         }
@@ -157,6 +158,8 @@
                     if (presetName !== 'default') {
                         return;
                     }
+                    advancedOpen = true;
+                    updateAdvancedVisibility();
                     syncingPreset = true;
                     watchedFields.forEach(function (fieldName) {
                         if (fieldName === 'code') {
@@ -204,7 +207,14 @@
                 });
 
                 watchedFields.forEach(function (fieldName) {
-                    $('#id_' + fieldName).on('change input', updatePresetFromAdvancedFields);
+                    var $field = $('#id_' + fieldName);
+                    var $checkboxGroup = $('input[name="' + fieldName + '"]');
+                    if ($checkboxGroup.length) {
+                        $checkboxGroup.on('change', updatePresetFromAdvancedFields);
+                    }
+                    if ($field.length) {
+                        $field.on('change input select2:select select2:unselect', updatePresetFromAdvancedFields);
+                    }
                 });
 
                 if ($preset.val() === 'default') {
