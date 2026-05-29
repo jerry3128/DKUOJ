@@ -616,6 +616,7 @@ class ContestAdmin(NoBatchDeleteMixin, SortableAdminBase, VersionAdmin):
             context['simple_preset_defaults'] = json.dumps(self.get_simple_preset_defaults(request))
         return super().render_change_form(request, context, add, change, form_url, obj)
 
+
 class ContestParticipationForm(ModelForm):
     class Meta:
         widgets = {
