@@ -157,6 +157,13 @@
                         });
                         return;
                     }
+                    if ($field.is('select')) {
+                        withPresetSuppressed(function () {
+                            var nextValue = value == null ? '' : String(value);
+                            $field.val(nextValue).trigger('change').trigger('change.select2');
+                        });
+                        return;
+                    }
                     withPresetSuppressed(function () {
                         forceTextboxValue($field, value);
                     });
@@ -219,7 +226,12 @@
                         }
                         setFieldValue(fieldName, presetDefaults[fieldName]);
                     });
-                    return requestAutofillCode();
+                    return requestAutofillCode().then(function (code) {
+                        if (advancedOpen) {
+                            updateAdvancedVisibility();
+                        }
+                        return code;
+                    });
                 }
 
                 function applyPreset(presetName) {
