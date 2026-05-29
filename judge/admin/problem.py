@@ -423,6 +423,11 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
             return self.add_fieldsets
         return super().get_fieldsets(request, obj)
 
+    def get_inline_instances(self, request, obj=None):
+        if obj is None and not self.is_advanced_add_mode(request, obj):
+            return []
+        return super().get_inline_instances(request, obj)
+
     def get_readonly_fields(self, request, obj=None):
         fields = self.readonly_fields
         if not request.user.has_perm('judge.create_private_problem'):

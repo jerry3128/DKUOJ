@@ -135,7 +135,7 @@
                     }
                     try {
                         var response = await fetch(
-                            '/api/v2/problem/check-code/?code=' + encodeURIComponent(code),
+                            '{% url "problem_check_code" %}?code=' + encodeURIComponent(code),
                             {
                                 method: 'GET',
                                 cache: 'no-cache',
@@ -166,6 +166,7 @@
 
                 function requestAutofillCode() {
                     var fallbackCode = presetDefaults.code == null ? '' : String(presetDefaults.code);
+                    setFieldValue('code', fallbackCode);
                     return generateIndependentProblemCode().then(function (generatedCode) {
                         presetDefaults.code = generatedCode || fallbackCode;
                         setFieldValue('code', presetDefaults.code);
