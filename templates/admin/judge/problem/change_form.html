@@ -74,7 +74,9 @@
                         callback();
                     } finally {
                         window.setTimeout(function () {
-                            suppressPresetCustom = false;
+                            if (suppressPresetCustom === true) {
+                                suppressPresetCustom = false;
+                            }
                         }, 0);
                     }
                 }
@@ -225,8 +227,10 @@
                         setPresetValue('custom');
                         return Promise.resolve();
                     }
+                    suppressPresetCustom = true;
                     return rerenderAdvancedSettings().finally(function () {
                         setPresetValue('default');
+                        suppressPresetCustom = false;
                     });
                 }
 
@@ -299,7 +303,7 @@
         <input type="hidden" name="_advanced_mode" value="1">
     {% elif show_embedded_advanced_toggle %}
         {{ adminform.form.embedded_advanced_mode }}
-        <div id="embedded-advanced-toggle-container" style="margin: 12px 0 16px;">
+        <div id="embedded-advanced-toggle-container" style="margin: 12px 0 16px 120px;">
             <button class="button" id="embedded-advanced-toggle" type="button">{{ _('Advanced') }}</button>
         </div>
     {% endif %}
