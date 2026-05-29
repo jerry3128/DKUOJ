@@ -4,17 +4,26 @@
 {% block extrastyle %}{{ block.super }}
     {% if show_embedded_advanced_toggle %}
         <style>
-            {% if is_embedded_advanced_mode %}
-                .embedded-advanced-fields,
-                .inline-group {
-                    display: block;
-                }
-            {% else %}
-                .embedded-advanced-fields,
-                .inline-group {
-                    display: none;
-                }
-            {% endif %}
+            #content-main.advanced-collapsed .embedded-advanced-fields,
+            #content-main.advanced-collapsed .inline-group {
+                max-height: 0;
+                overflow: hidden;
+                opacity: 0;
+                margin-top: 0;
+                margin-bottom: 0;
+                padding-top: 0;
+                padding-bottom: 0;
+                border-width: 0;
+                pointer-events: none;
+            }
+
+            #content-main .embedded-advanced-fields,
+            #content-main .inline-group {
+                max-height: 2000px;
+                opacity: 1;
+                overflow: hidden;
+                transition: max-height 0.2s ease, opacity 0.15s ease;
+            }
         </style>
     {% endif %}
 {% endblock %}
@@ -33,7 +42,7 @@
                 var presetDefaults = presetConfig.values || {};
                 var presetDisplay = presetConfig.display || {};
                 var $advancedToggleInput = $('#id_embedded_advanced_mode');
-                var $advancedSections = $('.embedded-advanced-fields, .inline-group');
+                var $contentMain = $('#content-main');
                 var $advancedButton = $('#embedded-advanced-toggle');
                 var $preset = $('#id_creation_preset');
                 var watchedFields = [
@@ -60,7 +69,7 @@
                 }
 
                 function updateAdvancedVisibility() {
-                    $advancedSections.toggle(advancedOpen);
+                    $contentMain.toggleClass('advanced-collapsed', !advancedOpen);
                     $advancedButton.text(
                         advancedOpen ? '{{ _("Hide advanced settings")|escapejs }}' : '{{ _("Advanced")|escapejs }}'
                     );
@@ -223,6 +232,7 @@
                 } else {
                     updatePresetFromAdvancedFields();
                 }
+                $contentMain.toggleClass('advanced-collapsed', !advancedOpen);
                 updateAdvancedVisibility();
             {% endif %}
         });
