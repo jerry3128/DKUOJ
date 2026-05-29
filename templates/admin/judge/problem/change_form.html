@@ -52,6 +52,7 @@
                 var $advancedButton = $('#embedded-advanced-toggle');
                 var $preset = $('#id_creation_preset');
                 var presetSyncingUi = false;
+                var suppressPresetCustom = false;
                 var watchedFields = [
                     'code', 'is_public', 'is_manually_managed', 'date', 'authors', 'curators', 'testers',
                     'organizations', 'classes', 'submission_source_visibility_mode', 'is_full_markup',
@@ -59,8 +60,6 @@
                     'types', 'group', 'points', 'partial', 'short_circuit', 'time_limit', 'memory_limit',
                     'allowed_languages', 'banned_users'
                 ];
-                var syncingPreset = false;
-
                 function updateAdvancedVisibility() {
                     $contentMain.toggleClass('advanced-expanded', advancedOpen);
                     $advancedButton.text(
@@ -69,38 +68,15 @@
                     $advancedToggleInput.val(advancedOpen ? '1' : '');
                 }
 
-                function normalizedValue(fieldName) {
-                    var defaultValue = presetDefaults[fieldName];
-                    if ($.isArray(defaultValue)) {
-                        return defaultValue.map(String).sort().join(',');
+                function withPresetSuppressed(callback) {
+                    suppressPresetCustom = true;
+                    try {
+                        callback();
+                    } finally {
+                        window.setTimeout(function () {
+                            suppressPresetCustom = false;
+                        }, 0);
                     }
-                    if (typeof defaultValue === 'boolean') {
-                        return defaultValue ? '1' : '0';
-                    }
-                    return defaultValue == null ? '' : String(defaultValue);
-                }
-
-                function currentValue(fieldName) {
-                    var $field = $('#id_' + fieldName);
-                    if (!$field.length) {
-                        $field = $('[name="' + fieldName + '"]');
-                    }
-                    var $checkboxGroup = $('input[name="' + fieldName + '"]');
-                    if ($checkboxGroup.length) {
-                        return $checkboxGroup.filter(':checked').map(function () {
-                            return String(this.value);
-                        }).get().sort().join(',');
-                    }
-                    if (!$field.length) {
-                        return '';
-                    }
-                    if ($field.is(':checkbox')) {
-                        return $field.is(':checked') ? '1' : '0';
-                    }
-                    if ($field.is('select[multiple]')) {
-                        return (($field.val() || []).map(String).sort().join(','));
-                    }
-                    return String($field.val() || '');
                 }
 
                 function forceTextboxValue($field, value) {
@@ -134,7 +110,9 @@
                     if (!$codeField.length) {
                         return;
                     }
-                    forceTextboxValue($codeField, value);
+                    withPresetSuppressed(function () {
+                        forceTextboxValue($codeField, value);
+                    });
                 }
 
                 function setFieldValue(fieldName, value) {
@@ -166,14 +144,20 @@
                         }
                     }
                     if ($field.is(':checkbox')) {
-                        $field.prop('checked', !!value).trigger('change').trigger('change.select2');
+                        withPresetSuppressed(function () {
+                            $field.prop('checked', !!value).trigger('change').trigger('change.select2');
+                        });
                         return;
                     }
                     if ($field.is('select[multiple]')) {
-                        $field.val((value || []).map(String)).trigger('change').trigger('change.select2');
+                        withPresetSuppressed(function () {
+                            $field.val((value || []).map(String)).trigger('change').trigger('change.select2');
+                        });
                         return;
                     }
-                    forceTextboxValue($field, value);
+                    withPresetSuppressed(function () {
+                        forceTextboxValue($field, value);
+                    });
                 }
 
                 async function checkProblemCode(code) {
@@ -241,9 +225,7 @@
                         setPresetValue('custom');
                         return Promise.resolve();
                     }
-                    syncingPreset = true;
                     return rerenderAdvancedSettings().finally(function () {
-                        syncingPreset = false;
                         setPresetValue('default');
                     });
                 }
@@ -265,7 +247,7 @@
                 }
 
                 function markPresetCustom() {
-                    if (syncingPreset) {
+                    if (suppressPresetCustom) {
                         return;
                     }
                     setPresetValue('custom');
@@ -293,8 +275,11 @@
                 );
 
                 var $presetRow = $('.form-row.field-creation_preset, .field-creation_preset').first();
+                if (!$presetRow.length && $preset.length) {
+                    $presetRow = $preset.closest('.form-row, .fieldBox, .aligned, .form-group');
+                }
                 if ($presetRow.length && $advancedButton.length) {
-                    $advancedButton.parent().insertAfter($presetRow);
+                    $('#embedded-advanced-toggle-container').insertAfter($presetRow);
                 }
 
                 if ($preset.val() === 'default') {
