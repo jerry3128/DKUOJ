@@ -158,8 +158,6 @@
                     if (presetName !== 'default') {
                         return;
                     }
-                    advancedOpen = true;
-                    updateAdvancedVisibility();
                     syncingPreset = true;
                     watchedFields.forEach(function (fieldName) {
                         if (fieldName === 'code') {
@@ -186,6 +184,9 @@
                 $advancedButton.on('click', function () {
                     advancedOpen = !advancedOpen;
                     updateAdvancedVisibility();
+                    if (advancedOpen && $preset.val() === 'default') {
+                        applyPreset('default');
+                    }
                 });
 
                 $preset.on('change', function () {
