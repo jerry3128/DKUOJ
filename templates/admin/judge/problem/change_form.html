@@ -267,12 +267,12 @@
                         return;
                     }
                     if ($preset.val() === value) {
-                        $preset.trigger('change');
+                        $preset.trigger('change.select2');
                         return;
                     }
                     presetSyncingUi = true;
                     $preset.val(value);
-                    $preset.trigger('change');
+                    $preset.trigger('change.select2');
                     window.requestAnimationFrame(function () {
                         presetSyncingUi = false;
                     });
