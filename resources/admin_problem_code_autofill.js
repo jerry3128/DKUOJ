@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function () {
+function initializeProblemCodeAutofill() {
     const codeInput = document.getElementById('id_code');
     if (!codeInput) return;
 
@@ -67,4 +67,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (isOriginalAdvancedPage && codeInput.value.trim() === '') {
         autofillProblemCode();
     }
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeProblemCodeAutofill);
+} else {
+    initializeProblemCodeAutofill();
+}
