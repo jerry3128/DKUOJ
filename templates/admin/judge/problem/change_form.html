@@ -93,6 +93,24 @@
                     return String($field.val() || '');
                 }
 
+                function forceTextboxValue($field, value) {
+                    var nextValue = value == null ? '' : String(value);
+                    var domField = $field.get(0);
+                    $field.val(nextValue);
+                    if (domField) {
+                        domField.value = nextValue;
+                        domField.setAttribute('value', nextValue);
+                    }
+                    window.requestAnimationFrame(function () {
+                        $field.val(nextValue);
+                        if (domField) {
+                            domField.value = nextValue;
+                            domField.setAttribute('value', nextValue);
+                        }
+                        $field.trigger('input').trigger('change').trigger('change.select2');
+                    });
+                }
+
                 function setFieldValue(fieldName, value) {
                     var $field = $('#id_' + fieldName);
                     var $checkboxGroup = $('input[name="' + fieldName + '"]');
@@ -126,7 +144,7 @@
                         $field.val((value || []).map(String)).trigger('change').trigger('change.select2');
                         return;
                     }
-                    $field.val(value == null ? '' : value).trigger('change').trigger('change.select2');
+                    forceTextboxValue($field, value);
                 }
 
                 async function checkProblemCode(code) {
