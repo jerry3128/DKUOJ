@@ -51,6 +51,7 @@
                 var $contentMain = $('#content-main');
                 var $advancedButton = $('#embedded-advanced-toggle');
                 var $preset = $('#id_creation_preset');
+                var presetSyncingUi = false;
                 var watchedFields = [
                     'code', 'is_public', 'is_manually_managed', 'date', 'authors', 'curators', 'testers',
                     'organizations', 'classes', 'submission_source_visibility_mode', 'is_full_markup',
@@ -248,7 +249,16 @@
                 }
 
                 function setPresetValue(value) {
-                    $preset.val(value).trigger('change.select2');
+                    if ($preset.val() === value) {
+                        $preset.trigger('change.select2');
+                        return;
+                    }
+                    presetSyncingUi = true;
+                    $preset.val(value);
+                    $preset.trigger('change.select2');
+                    window.requestAnimationFrame(function () {
+                        presetSyncingUi = false;
+                    });
                 }
 
                 function markPresetCustom() {
@@ -267,19 +277,17 @@
                 });
 
                 $preset.on('change', function () {
+                    if (presetSyncingUi) {
+                        return;
+                    }
                     applyPreset($(this).val());
                 });
 
-                watchedFields.forEach(function (fieldName) {
-                    var $field = $('#id_' + fieldName);
-                    var $checkboxGroup = $('input[name="' + fieldName + '"]');
-                    if ($checkboxGroup.length) {
-                        $checkboxGroup.on('change', markPresetCustom);
-                    }
-                    if ($field.length) {
-                        $field.on('change input select2:select select2:unselect', markPresetCustom);
-                    }
-                });
+                $contentMain.on(
+                    'change input select2:select select2:unselect',
+                    '.embedded-advanced-fields :input, .inline-group :input',
+                    markPresetCustom
+                );
 
                 if ($preset.val() === 'default') {
                     applyPreset('default');
@@ -298,13 +306,7 @@
         <input type="hidden" name="_advanced_mode" value="1">
     {% elif show_embedded_advanced_toggle %}
         {{ adminform.form.embedded_advanced_mode }}
-    {% endif %}
-{% endblock %}
-
-{% block after_related_objects %}
-    {{ block.super }}
-    {% if show_embedded_advanced_toggle %}
-        <div style="margin-top: 16px;">
+        <div style="margin: 12px 0 16px;">
             <button class="button" id="embedded-advanced-toggle" type="button">{{ _('Advanced') }}</button>
         </div>
     {% endif %}
