@@ -75,6 +75,9 @@
 
                 function currentValue(fieldName) {
                     var $field = $('#id_' + fieldName);
+                    if (!$field.length) {
+                        $field = $('[name="' + fieldName + '"]');
+                    }
                     var $checkboxGroup = $('input[name="' + fieldName + '"]');
                     if ($checkboxGroup.length) {
                         return $checkboxGroup.filter(':checked').map(function () {
@@ -111,8 +114,27 @@
                     });
                 }
 
+                function getCodeField() {
+                    var $field = $('#id_code');
+                    if (!$field.length) {
+                        $field = $('[name="code"]');
+                    }
+                    return $field;
+                }
+
+                function overwriteCodeField(value) {
+                    var $codeField = getCodeField();
+                    if (!$codeField.length) {
+                        return;
+                    }
+                    forceTextboxValue($codeField, value);
+                }
+
                 function setFieldValue(fieldName, value) {
                     var $field = $('#id_' + fieldName);
+                    if (!$field.length) {
+                        $field = $('[name="' + fieldName + '"]');
+                    }
                     var $checkboxGroup = $('input[name="' + fieldName + '"]');
                     if ($checkboxGroup.length) {
                         var targetValues = (value || []).map(String);
@@ -184,13 +206,14 @@
 
                 function requestAutofillCode() {
                     var fallbackCode = presetDefaults.code == null ? '' : String(presetDefaults.code);
-                    setFieldValue('code', fallbackCode);
+                    overwriteCodeField('');
+                    overwriteCodeField(fallbackCode);
                     return generateIndependentProblemCode().then(function (generatedCode) {
                         presetDefaults.code = generatedCode || fallbackCode;
-                        setFieldValue('code', presetDefaults.code);
+                        overwriteCodeField(presetDefaults.code);
                         return presetDefaults.code;
                     }).catch(function () {
-                        setFieldValue('code', fallbackCode);
+                        overwriteCodeField(fallbackCode);
                         presetDefaults.code = fallbackCode;
                         return fallbackCode;
                     });
