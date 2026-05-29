@@ -249,13 +249,16 @@
                 }
 
                 function setPresetValue(value) {
+                    if (!$preset.length) {
+                        return;
+                    }
                     if ($preset.val() === value) {
-                        $preset.trigger('change.select2');
+                        $preset.trigger('change');
                         return;
                     }
                     presetSyncingUi = true;
                     $preset.val(value);
-                    $preset.trigger('change.select2');
+                    $preset.trigger('change');
                     window.requestAnimationFrame(function () {
                         presetSyncingUi = false;
                     });
@@ -289,6 +292,11 @@
                     markPresetCustom
                 );
 
+                var $presetRow = $('.form-row.field-creation_preset, .field-creation_preset').first();
+                if ($presetRow.length && $advancedButton.length) {
+                    $advancedButton.parent().insertAfter($presetRow);
+                }
+
                 if ($preset.val() === 'default') {
                     applyPreset('default');
                 } else {
@@ -306,7 +314,7 @@
         <input type="hidden" name="_advanced_mode" value="1">
     {% elif show_embedded_advanced_toggle %}
         {{ adminform.form.embedded_advanced_mode }}
-        <div style="margin: 12px 0 16px;">
+        <div id="embedded-advanced-toggle-container" style="margin: 12px 0 16px;">
             <button class="button" id="embedded-advanced-toggle" type="button">{{ _('Advanced') }}</button>
         </div>
     {% endif %}
