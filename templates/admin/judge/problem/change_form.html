@@ -87,13 +87,29 @@
                     $field.val(nextValue);
                     if (domField) {
                         domField.value = nextValue;
-                        domField.setAttribute('value', nextValue);
+                        domField.defaultValue = nextValue;
+                        if (nextValue === '') {
+                            domField.removeAttribute('value');
+                        } else {
+                            domField.setAttribute('value', nextValue);
+                        }
+                        if (domField.tagName && domField.tagName.toLowerCase() === 'textarea') {
+                            domField.textContent = nextValue;
+                        }
                     }
                     window.requestAnimationFrame(function () {
                         $field.val(nextValue);
                         if (domField) {
                             domField.value = nextValue;
-                            domField.setAttribute('value', nextValue);
+                            domField.defaultValue = nextValue;
+                            if (nextValue === '') {
+                                domField.removeAttribute('value');
+                            } else {
+                                domField.setAttribute('value', nextValue);
+                            }
+                            if (domField.tagName && domField.tagName.toLowerCase() === 'textarea') {
+                                domField.textContent = nextValue;
+                            }
                         }
                         $field.trigger('input').trigger('change').trigger('change.select2');
                     });
@@ -205,7 +221,7 @@
                 }
 
                 function requestAutofillCode() {
-                    var fallbackCode = presetDefaults.code == null ? '' : String(presetDefaults.code);
+                    var fallbackCode = presetDefaults.code == null ? 'p000000' : String(presetDefaults.code);
                     overwriteCodeField('');
                     overwriteCodeField(fallbackCode);
                     return generateIndependentProblemCode().then(function (generatedCode) {
