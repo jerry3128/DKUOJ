@@ -54,20 +54,6 @@
                 ];
                 var syncingPreset = false;
 
-                function waitForAutofillFunction(remainingAttempts) {
-                    if (typeof window.DKUOJAutofillProblemCode === 'function') {
-                        return Promise.resolve(window.DKUOJAutofillProblemCode);
-                    }
-                    if (remainingAttempts <= 0) {
-                        return Promise.resolve(null);
-                    }
-                    return new Promise(function (resolve) {
-                        window.setTimeout(function () {
-                            waitForAutofillFunction(remainingAttempts - 1).then(resolve);
-                        }, 100);
-                    });
-                }
-
                 function updateAdvancedVisibility() {
                     $contentMain.toggleClass('advanced-collapsed', !advancedOpen);
                     $advancedButton.text(
@@ -143,19 +129,47 @@
                     $field.val(value == null ? '' : value).trigger('change').trigger('change.select2');
                 }
 
+                async function checkProblemCode(code) {
+                    if (!code) {
+                        return null;
+                    }
+                    try {
+                        var response = await fetch(
+                            '/api/v2/problem/check-code/?code=' + encodeURIComponent(code),
+                            {
+                                method: 'GET',
+                                cache: 'no-cache',
+                                headers: {'X-Requested-With': 'XMLHttpRequest'}
+                            }
+                        );
+                        if (!response.ok) {
+                            return null;
+                        }
+                        var data = await response.json();
+                        return data.exists;
+                    } catch (error) {
+                        return null;
+                    }
+                }
+
+                async function generateIndependentProblemCode() {
+                    var max = 1000000;
+                    for (var i = 0; i < max; i++) {
+                        var code = 'p' + String(i).padStart(6, '0');
+                        var exists = await checkProblemCode(code);
+                        if (exists === false) {
+                            return code;
+                        }
+                    }
+                    return 'clone' + String(Date.now()).slice(-6);
+                }
+
                 function requestAutofillCode() {
                     var fallbackCode = presetDefaults.code == null ? '' : String(presetDefaults.code);
-                    return waitForAutofillFunction(20).then(function (autofillFn) {
-                        if (autofillFn) {
-                            return autofillFn().then(function (generatedCode) {
-                                presetDefaults.code = generatedCode || fallbackCode;
-                                setFieldValue('code', presetDefaults.code);
-                                return presetDefaults.code;
-                            });
-                        }
-                        setFieldValue('code', fallbackCode);
-                        presetDefaults.code = fallbackCode;
-                        return fallbackCode;
+                    return generateIndependentProblemCode().then(function (generatedCode) {
+                        presetDefaults.code = generatedCode || fallbackCode;
+                        setFieldValue('code', presetDefaults.code);
+                        return presetDefaults.code;
                     }).catch(function () {
                         setFieldValue('code', fallbackCode);
                         presetDefaults.code = fallbackCode;
@@ -163,18 +177,23 @@
                     });
                 }
 
-                function applyPreset(presetName) {
-                    if (presetName !== 'default') {
-                        return;
-                    }
-                    syncingPreset = true;
+                function rerenderAdvancedSettings() {
                     watchedFields.forEach(function (fieldName) {
                         if (fieldName === 'code') {
                             return;
                         }
                         setFieldValue(fieldName, presetDefaults[fieldName]);
                     });
-                    requestAutofillCode().finally(function () {
+                    return requestAutofillCode();
+                }
+
+                function applyPreset(presetName) {
+                    if (presetName !== 'default') {
+                        updatePresetFromAdvancedFields();
+                        return Promise.resolve();
+                    }
+                    syncingPreset = true;
+                    return rerenderAdvancedSettings().finally(function () {
                         syncingPreset = false;
                         updatePresetFromAdvancedFields();
                     });
@@ -199,9 +218,7 @@
                 });
 
                 $preset.on('change', function () {
-                    if ($(this).val() === 'default') {
-                        applyPreset('default');
-                    }
+                    applyPreset($(this).val());
                 });
 
                 $('#id_name').on('input', function () {
