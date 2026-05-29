@@ -237,24 +237,25 @@
 
                 function applyPreset(presetName) {
                     if (presetName !== 'default') {
-                        updatePresetFromAdvancedFields();
+                        setPresetValue('custom');
                         return Promise.resolve();
                     }
                     syncingPreset = true;
                     return rerenderAdvancedSettings().finally(function () {
                         syncingPreset = false;
-                        updatePresetFromAdvancedFields();
+                        setPresetValue('default');
                     });
                 }
 
-                function updatePresetFromAdvancedFields() {
+                function setPresetValue(value) {
+                    $preset.val(value).trigger('change.select2');
+                }
+
+                function markPresetCustom() {
                     if (syncingPreset) {
                         return;
                     }
-                    var isCustomized = watchedFields.some(function (fieldName) {
-                        return currentValue(fieldName) !== normalizedValue(fieldName);
-                    });
-                    $preset.val(isCustomized ? 'custom' : 'default');
+                    setPresetValue('custom');
                 }
 
                 $advancedButton.on('click', function () {
@@ -273,17 +274,17 @@
                     var $field = $('#id_' + fieldName);
                     var $checkboxGroup = $('input[name="' + fieldName + '"]');
                     if ($checkboxGroup.length) {
-                        $checkboxGroup.on('change', updatePresetFromAdvancedFields);
+                        $checkboxGroup.on('change', markPresetCustom);
                     }
                     if ($field.length) {
-                        $field.on('change input select2:select select2:unselect', updatePresetFromAdvancedFields);
+                        $field.on('change input select2:select select2:unselect', markPresetCustom);
                     }
                 });
 
                 if ($preset.val() === 'default') {
                     applyPreset('default');
                 } else {
-                    updatePresetFromAdvancedFields();
+                    setPresetValue($preset.val() || 'custom');
                 }
                 updateAdvancedVisibility();
             {% endif %}
