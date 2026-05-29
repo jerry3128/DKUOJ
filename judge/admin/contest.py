@@ -1,3 +1,5 @@
+import json
+
 from adminsortable2.admin import SortableAdminBase, SortableInlineAdminMixin
 from django import forms
 from django.contrib import admin
@@ -110,6 +112,8 @@ class ContestForm(ModelForm):
                 _('You must select organizations before selecting classes.'),
             )
 
+        return cleaned_data
+
     class Meta:
         widgets = {
             'authors': AdminHeavySelect2MultipleWidget(data_view='profile_select2'),
@@ -128,7 +132,135 @@ class ContestForm(ModelForm):
         }
 
 
+class SimpleContestCreationForm(ContestForm):
+    CREATION_PRESET_DEFAULT = 'default'
+    CREATION_PRESET_CUSTOM = 'custom'
+
+    creation_preset = forms.ChoiceField(
+        label=_('Creation preset'),
+        required=False,
+        initial=CREATION_PRESET_DEFAULT,
+        choices=(
+            (CREATION_PRESET_DEFAULT, _('Default')),
+            (CREATION_PRESET_CUSTOM, _('Custom')),
+        ),
+        help_text=_('Presets can automatically fill advanced settings.'),
+    )
+    embedded_advanced_mode = forms.BooleanField(required=False, widget=forms.HiddenInput())
+
+    class Meta(ContestForm.Meta):
+        model = Contest
+        fields = (
+            'key', 'name', 'authors', 'curators', 'testers', 'tester_see_submissions', 'tester_see_scoreboard',
+            'spectators', 'is_visible', 'use_clarifications', 'hide_problem_tags', 'hide_problem_authors',
+            'show_short_display', 'run_pretests_only', 'locked_after', 'scoreboard_visibility', 'points_precision',
+            'allow_virtual_participation', 'start_time', 'end_time', 'time_limit', 'description', 'og_image',
+            'logo_override_image', 'tags', 'summary', 'format_name', 'format_config', 'problem_label_script',
+            'is_rated', 'rate_all', 'rating_floor', 'rating_ceiling', 'performance_ceiling_override',
+            'rate_exclude', 'access_code', 'private_contestants', 'organizations', 'classes',
+            'join_organizations', 'view_contest_scoreboard', 'view_contest_submissions', 'banned_users',
+        )
+
+    def __init__(self, *args, **kwargs):
+        super(SimpleContestCreationForm, self).__init__(*args, **kwargs)
+        for field_name in (
+            'key', 'authors', 'curators', 'testers', 'tester_see_submissions', 'tester_see_scoreboard',
+            'spectators', 'is_visible', 'use_clarifications', 'hide_problem_tags', 'hide_problem_authors',
+            'show_short_display', 'run_pretests_only', 'locked_after', 'scoreboard_visibility', 'points_precision',
+            'allow_virtual_participation', 'time_limit', 'description', 'og_image', 'logo_override_image', 'tags',
+            'summary', 'format_name', 'format_config', 'problem_label_script', 'is_rated', 'rate_all',
+            'rating_floor', 'rating_ceiling', 'performance_ceiling_override', 'rate_exclude', 'access_code',
+            'private_contestants', 'organizations', 'classes', 'join_organizations', 'view_contest_scoreboard',
+            'view_contest_submissions', 'banned_users',
+        ):
+            self.fields[field_name].required = False
+        self.fields['creation_preset'].choices = (
+            (self.CREATION_PRESET_DEFAULT, _('Default')),
+            (self.CREATION_PRESET_CUSTOM, _('Custom')),
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('embedded_advanced_mode'):
+            cleaned_data['key'] = cleaned_data.get('key') or getattr(self, 'generated_simple_key', '')
+            return cleaned_data
+
+        cleaned_data['key'] = cleaned_data.get('key') or getattr(self, 'generated_simple_key', '')
+        cleaned_data['tester_see_submissions'] = False
+        cleaned_data['tester_see_scoreboard'] = False
+        cleaned_data['is_visible'] = False
+        cleaned_data['use_clarifications'] = True
+        cleaned_data['hide_problem_tags'] = False
+        cleaned_data['hide_problem_authors'] = False
+        cleaned_data['show_short_display'] = False
+        cleaned_data['run_pretests_only'] = False
+        cleaned_data['locked_after'] = None
+        cleaned_data['scoreboard_visibility'] = Contest.SCOREBOARD_VISIBLE
+        cleaned_data['points_precision'] = Contest._meta.get_field('points_precision').default
+        cleaned_data['allow_virtual_participation'] = True
+        cleaned_data['time_limit'] = None
+        cleaned_data['og_image'] = ''
+        cleaned_data['logo_override_image'] = ''
+        cleaned_data['summary'] = ''
+        cleaned_data['access_code'] = ''
+        cleaned_data['format_name'] = Contest._meta.get_field('format_name').default
+        cleaned_data['format_config'] = None
+        cleaned_data['problem_label_script'] = ''
+        cleaned_data['is_rated'] = False
+        cleaned_data['rate_all'] = False
+        cleaned_data['rating_floor'] = None
+        cleaned_data['rating_ceiling'] = None
+        cleaned_data['performance_ceiling_override'] = None
+        return cleaned_data
+
+
 class ContestAdmin(NoBatchDeleteMixin, SortableAdminBase, VersionAdmin):
+    add_fieldsets = (
+        (None, {
+            'fields': ('name', 'start_time', 'end_time', 'creation_preset'),
+        }),
+        (_('Advanced Identity'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': (
+                'key', 'authors', 'curators', 'testers', 'tester_see_submissions',
+                'tester_see_scoreboard', 'spectators',
+            ),
+        }),
+        (_('Advanced Settings'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': (
+                'is_visible', 'use_clarifications', 'hide_problem_tags', 'hide_problem_authors',
+                'show_short_display', 'run_pretests_only', 'locked_after', 'scoreboard_visibility',
+                'points_precision', 'allow_virtual_participation',
+            ),
+        }),
+        (_('Advanced Details'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': ('time_limit', 'description', 'og_image', 'logo_override_image', 'tags', 'summary'),
+        }),
+        (_('Advanced Format'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': ('format_name', 'format_config', 'problem_label_script'),
+        }),
+        (_('Advanced Rating'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': (
+                'is_rated', 'rate_all', 'rating_floor', 'rating_ceiling',
+                'performance_ceiling_override', 'rate_exclude',
+            ),
+        }),
+        (_('Advanced Access'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': (
+                'access_code', 'private_contestants', 'organizations', 'classes', 'join_organizations',
+                'view_contest_scoreboard', 'view_contest_submissions',
+            ),
+        }),
+        (_('Advanced Justice'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': ('banned_users',),
+        }),
+    )
     fieldsets = (
         (None, {'fields': ('key', 'name', 'authors', 'curators', 'testers', 'tester_see_submissions',
                            'tester_see_scoreboard', 'spectators')}),
@@ -154,6 +286,104 @@ class ContestAdmin(NoBatchDeleteMixin, SortableAdminBase, VersionAdmin):
     change_list_template = 'admin/judge/contest/change_list.html'
     filter_horizontal = ['rate_exclude']
     date_hierarchy = 'start_time'
+
+    def is_advanced_add_mode(self, request, obj=None):
+        if request.POST.get('_advanced_mode') == '1':
+            return True
+        return obj is None and request.GET.get('advanced') == '1'
+
+    def is_embedded_advanced_mode(self, request, obj=None):
+        return request.POST.get('embedded_advanced_mode') in ('1', 'on', 'true', 'True')
+
+    def generate_contest_key(self):
+        max_key = 1000000
+        for i in range(max_key):
+            key = 'c{:06d}'.format(i)
+            if not Contest.objects.filter(key=key).exists():
+                return key
+        return 'contest{}'.format(str(timezone.now().timestamp()).replace('.', '')[-6:])
+
+    def get_simple_preset_defaults(self, request):
+        profile = getattr(request.user, 'profile', None)
+        default_key = self.generate_contest_key()
+        return {
+            'values': {
+                'key': default_key,
+                'authors': [profile.id] if profile else [],
+                'curators': [],
+                'testers': [],
+                'tester_see_submissions': False,
+                'tester_see_scoreboard': False,
+                'spectators': [],
+                'is_visible': False,
+                'use_clarifications': True,
+                'hide_problem_tags': False,
+                'hide_problem_authors': False,
+                'show_short_display': False,
+                'run_pretests_only': False,
+                'locked_after': '',
+                'scoreboard_visibility': Contest.SCOREBOARD_VISIBLE,
+                'points_precision': str(Contest._meta.get_field('points_precision').default),
+                'allow_virtual_participation': True,
+                'time_limit': '',
+                'description': '',
+                'og_image': '',
+                'logo_override_image': '',
+                'tags': [],
+                'summary': '',
+                'format_name': Contest._meta.get_field('format_name').default,
+                'format_config': '',
+                'problem_label_script': '',
+                'is_rated': False,
+                'rate_all': False,
+                'rating_floor': '',
+                'rating_ceiling': '',
+                'performance_ceiling_override': '',
+                'rate_exclude': [],
+                'access_code': '',
+                'private_contestants': [],
+                'organizations': [],
+                'classes': [],
+                'join_organizations': [],
+                'view_contest_scoreboard': [],
+                'view_contest_submissions': [],
+                'banned_users': [],
+            },
+            'display': {
+                'authors': [{'id': str(profile.id), 'text': profile.user.username}] if profile else [],
+            },
+        }
+
+    def apply_creation_defaults(self, request, obj):
+        obj.key = obj.key or self.generate_contest_key()
+        obj.tester_see_submissions = False
+        obj.tester_see_scoreboard = False
+        obj.is_visible = False
+        obj.use_clarifications = True
+        obj.hide_problem_tags = False
+        obj.hide_problem_authors = False
+        obj.show_short_display = False
+        obj.run_pretests_only = False
+        obj.locked_after = None
+        obj.scoreboard_visibility = Contest.SCOREBOARD_VISIBLE
+        obj.points_precision = Contest._meta.get_field('points_precision').default
+        obj.allow_virtual_participation = True
+        obj.time_limit = None
+        obj.og_image = ''
+        obj.logo_override_image = ''
+        obj.summary = ''
+        obj.access_code = ''
+        obj.format_name = Contest._meta.get_field('format_name').default
+        obj.format_config = None
+        obj.problem_label_script = ''
+        obj.is_rated = False
+        obj.rate_all = False
+        obj.rating_floor = None
+        obj.rating_ceiling = None
+        obj.performance_ceiling_override = None
+        obj.is_private = False
+        obj.is_organization_private = False
+        obj.limit_join_organizations = False
 
     def get_actions(self, request):
         actions = super(ContestAdmin, self).get_actions(request)
@@ -194,7 +424,24 @@ class ContestAdmin(NoBatchDeleteMixin, SortableAdminBase, VersionAdmin):
             readonly += ['performance_ceiling_override']
         return readonly
 
+    def get_fieldsets(self, request, obj=None):
+        if obj is None and not self.is_advanced_add_mode(request, obj):
+            return self.add_fieldsets
+        return super().get_fieldsets(request, obj)
+
+    def get_inline_instances(self, request, obj=None):
+        if obj is None and not self.is_advanced_add_mode(request, obj):
+            return []
+        return super().get_inline_instances(request, obj)
+
     def save_model(self, request, obj, form, change):
+        if (
+            not change and
+            not self.is_advanced_add_mode(request, obj) and
+            not self.is_embedded_advanced_mode(request, obj)
+        ):
+            self.apply_creation_defaults(request, obj)
+
         # `private_contestants` and `organizations` will not appear in `cleaned_data` if user cannot edit it
         if form.changed_data:
             if 'private_contestants' in form.changed_data:
@@ -226,6 +473,14 @@ class ContestAdmin(NoBatchDeleteMixin, SortableAdminBase, VersionAdmin):
         # Only rescored if we did not already do so in `save_model`
         if not self._rescored and any(formset.has_changed() for formset in formsets):
             self._rescore(form.cleaned_data['key'])
+        if (
+            change or
+            self.is_advanced_add_mode(request, form.instance) or
+            self.is_embedded_advanced_mode(request, form.instance)
+        ):
+            return
+        if hasattr(request.user, 'profile'):
+            form.instance.authors.set([request.user.profile])
 
     def has_change_permission(self, request, obj=None):
         if not request.user.has_perm('judge.edit_own_contest'):
@@ -326,6 +581,8 @@ class ContestAdmin(NoBatchDeleteMixin, SortableAdminBase, VersionAdmin):
         return HttpResponseRedirect(request.headers.get('referer', reverse('admin:judge_contest_changelist')))
 
     def get_form(self, request, obj=None, **kwargs):
+        if obj is None and not self.is_advanced_add_mode(request, obj):
+            kwargs['form'] = SimpleContestCreationForm
         form = super(ContestAdmin, self).get_form(request, obj, **kwargs)
         if 'problem_label_script' in form.base_fields:
             # form.base_fields['problem_label_script'] does not exist when the user has only view permission
@@ -341,11 +598,23 @@ class ContestAdmin(NoBatchDeleteMixin, SortableAdminBase, VersionAdmin):
             Q(user__user_permissions__codename__in=perms),
         ).distinct()
         form.base_fields['classes'].queryset = Class.get_visible_classes(request.user)
+        if obj is None and not self.is_advanced_add_mode(request, obj):
+            form.generated_simple_key = self.generate_contest_key()
+            form.simple_preset_defaults = self.get_simple_preset_defaults(request)
         return form
 
     class Media:
         js = ('admin_class_filter.js', 'admin_contest_key_autofill.js')
 
+    def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
+        context['show_embedded_advanced_toggle'] = add and not self.is_advanced_add_mode(request, obj)
+        context['is_advanced_add'] = add and self.is_advanced_add_mode(request, obj)
+        context['is_embedded_advanced_mode'] = add and not self.is_advanced_add_mode(request, obj) and (
+            self.is_embedded_advanced_mode(request, obj)
+        )
+        if context['show_embedded_advanced_toggle']:
+            context['simple_preset_defaults'] = json.dumps(self.get_simple_preset_defaults(request))
+        return super().render_change_form(request, context, add, change, form_url, obj)
 
 class ContestParticipationForm(ModelForm):
     class Meta:

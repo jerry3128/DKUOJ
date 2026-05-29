@@ -51,11 +51,14 @@ function initializeProblemCodeAutofill() {
         return `clone${timestamp}`;
     }
 
-    async function autofillProblemCode() {
+    async function autofillProblemCode(options) {
+        const config = options || {};
         try {
             const uniqueCode = await generateUniqueCloneCode();
             codeInput.value = uniqueCode;
-            codeInput.dispatchEvent(new Event('change', {bubbles: true}));
+            if (!config.silent) {
+                codeInput.dispatchEvent(new Event('change', {bubbles: true}));
+            }
             return uniqueCode;
         } catch (error) {
             console.error('Failed to generate code:', error);

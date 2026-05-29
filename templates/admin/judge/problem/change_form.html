@@ -68,36 +68,12 @@
                     $advancedToggleInput.val(advancedOpen ? '1' : '');
                 }
 
-                function withPresetSuppressed(callback) {
-                    suppressPresetCustom = true;
-                    try {
-                        callback();
-                    } finally {
-                        window.setTimeout(function () {
-                            if (suppressPresetCustom === true) {
-                                suppressPresetCustom = false;
-                            }
-                        }, 0);
-                    }
-                }
-
-                function forceTextboxValue($field, value) {
+                function forceTextboxValue($field, value, options) {
+                    var config = options || {};
+                    var triggerEvents = config.triggerEvents !== false;
                     var nextValue = value == null ? '' : String(value);
                     var domField = $field.get(0);
-                    $field.val(nextValue);
-                    if (domField) {
-                        domField.value = nextValue;
-                        domField.defaultValue = nextValue;
-                        if (nextValue === '') {
-                            domField.removeAttribute('value');
-                        } else {
-                            domField.setAttribute('value', nextValue);
-                        }
-                        if (domField.tagName && domField.tagName.toLowerCase() === 'textarea') {
-                            domField.textContent = nextValue;
-                        }
-                    }
-                    window.requestAnimationFrame(function () {
+                    function applyValue() {
                         $field.val(nextValue);
                         if (domField) {
                             domField.value = nextValue;
@@ -111,8 +87,15 @@
                                 domField.textContent = nextValue;
                             }
                         }
-                        $field.trigger('input').trigger('change').trigger('change.select2');
-                    });
+                        if (triggerEvents) {
+                            $field.trigger('input').trigger('change').trigger('change.select2');
+                        }
+                    }
+                    applyValue();
+                    window.requestAnimationFrame(applyValue);
+                    window.setTimeout(applyValue, 0);
+                    window.setTimeout(applyValue, 50);
+                    window.setTimeout(applyValue, 150);
                 }
 
                 function getCodeField() {
@@ -128,18 +111,21 @@
                     if (!$codeField.length) {
                         return;
                     }
-                    withPresetSuppressed(function () {
-                        forceTextboxValue($codeField, value);
-                    });
+                    forceTextboxValue($codeField, value, {triggerEvents: false});
                 }
 
                 function setFieldValue(fieldName, value) {
+                    if (fieldName === 'date') {
+                        forceTextboxValue($('#id_date_0'), '');
+                        forceTextboxValue($('#id_date_1'), '');
+                        return;
+                    }
                     var $field = $('#id_' + fieldName);
                     if (!$field.length) {
                         $field = $('[name="' + fieldName + '"]');
                     }
-                    var $checkboxGroup = $('input[name="' + fieldName + '"]');
-                    if ($checkboxGroup.length) {
+                    var $checkboxGroup = $('input[type="checkbox"][name="' + fieldName + '"]');
+                    if ($checkboxGroup.length > 1) {
                         var targetValues = (value || []).map(String);
                         $checkboxGroup.each(function () {
                             $(this).prop('checked', targetValues.indexOf(String(this.value)) !== -1);
@@ -162,27 +148,19 @@
                         }
                     }
                     if ($field.is(':checkbox')) {
-                        withPresetSuppressed(function () {
-                            $field.prop('checked', !!value).trigger('change').trigger('change.select2');
-                        });
+                        $field.prop('checked', !!value).trigger('change').trigger('change.select2');
                         return;
                     }
                     if ($field.is('select[multiple]')) {
-                        withPresetSuppressed(function () {
-                            $field.val((value || []).map(String)).trigger('change').trigger('change.select2');
-                        });
+                        $field.val((value || []).map(String)).trigger('change').trigger('change.select2');
                         return;
                     }
                     if ($field.is('select')) {
-                        withPresetSuppressed(function () {
-                            var nextValue = value == null ? '' : String(value);
-                            $field.val(nextValue).trigger('change').trigger('change.select2');
-                        });
+                        var nextValue = value == null ? '' : String(value);
+                        $field.val(nextValue).trigger('change').trigger('change.select2');
                         return;
                     }
-                    withPresetSuppressed(function () {
-                        forceTextboxValue($field, value);
-                    });
+                    forceTextboxValue($field, value, {triggerEvents: false});
                 }
 
                 async function checkProblemCode(code) {
@@ -224,6 +202,17 @@
                     var fallbackCode = presetDefaults.code == null ? 'p000000' : String(presetDefaults.code);
                     overwriteCodeField('');
                     overwriteCodeField(fallbackCode);
+                    if (typeof window.DKUOJAutofillProblemCode === 'function') {
+                        return window.DKUOJAutofillProblemCode({silent: true}).then(function (generatedCode) {
+                            presetDefaults.code = generatedCode || fallbackCode;
+                            overwriteCodeField(presetDefaults.code);
+                            return presetDefaults.code;
+                        }).catch(function () {
+                            overwriteCodeField(fallbackCode);
+                            presetDefaults.code = fallbackCode;
+                            return fallbackCode;
+                        });
+                    }
                     return generateIndependentProblemCode().then(function (generatedCode) {
                         presetDefaults.code = generatedCode || fallbackCode;
                         overwriteCodeField(presetDefaults.code);
@@ -256,9 +245,10 @@
                         return Promise.resolve();
                     }
                     suppressPresetCustom = true;
+                    setPresetValue('default');
                     return rerenderAdvancedSettings().finally(function () {
-                        setPresetValue('default');
                         suppressPresetCustom = false;
+                        updatePresetFromAdvancedFields();
                     });
                 }
 
@@ -266,23 +256,74 @@
                     if (!$preset.length) {
                         return;
                     }
-                    if ($preset.val() === value) {
-                        $preset.trigger('change.select2');
-                        return;
+                    var domPreset = $preset.get(0);
+                    if (domPreset) {
+                        domPreset.value = value;
                     }
-                    presetSyncingUi = true;
                     $preset.val(value);
-                    $preset.trigger('change.select2');
-                    window.requestAnimationFrame(function () {
-                        presetSyncingUi = false;
-                    });
+                    $preset.find('option').prop('selected', false);
+                    $preset.find('option[value="' + value + '"]').prop('selected', true);
                 }
 
-                function markPresetCustom() {
+                function markPresetCustom(event) {
                     if (suppressPresetCustom) {
                         return;
                     }
-                    setPresetValue('custom');
+                    updatePresetFromAdvancedFields();
+                }
+
+                function normalizedValue(fieldName) {
+                    var defaultValue = presetDefaults[fieldName];
+                    if ($.isArray(defaultValue)) {
+                        return defaultValue.map(String).sort().join(',');
+                    }
+                    if (typeof defaultValue === 'boolean') {
+                        return defaultValue ? '1' : '0';
+                    }
+                    return defaultValue == null ? '' : String(defaultValue);
+                }
+
+                function currentValue(fieldName) {
+                    if (fieldName === 'date') {
+                        var dateValue = $('#id_date_0').val() || '';
+                        var timeValue = $('#id_date_1').val() || '';
+                        return (dateValue + ' ' + timeValue).trim();
+                    }
+
+                    var $field = $('#id_' + fieldName);
+                    if (!$field.length) {
+                        $field = $('[name="' + fieldName + '"]');
+                    }
+                    var $checkboxGroup = $('input[type="checkbox"][name="' + fieldName + '"]');
+                    if ($checkboxGroup.length > 1) {
+                        return $checkboxGroup.filter(':checked').map(function () {
+                            return String(this.value);
+                        }).get().sort().join(',');
+                    }
+                    if (!$field.length) {
+                        return '';
+                    }
+                    if ($field.is(':checkbox')) {
+                        return $field.is(':checked') ? '1' : '0';
+                    }
+                    if ($field.is('select[multiple]')) {
+                        return (($field.val() || []).map(String).sort().join(','));
+                    }
+                    return String($field.val() || '');
+                }
+
+                function updatePresetFromAdvancedFields() {
+                    if (suppressPresetCustom) {
+                        return;
+                    }
+                    var isCustomized = watchedFields.some(function (fieldName) {
+                        return currentValue(fieldName) !== normalizedValue(fieldName);
+                    });
+                    setPresetValue(isCustomized ? 'custom' : 'default');
+                }
+
+                function schedulePresetRefresh() {
+                    window.setTimeout(updatePresetFromAdvancedFields, 0);
                 }
 
                 $advancedButton.on('click', function () {
@@ -293,18 +334,36 @@
                     }
                 });
 
-                $preset.on('change', function () {
-                    if (presetSyncingUi) {
-                        return;
-                    }
-                    applyPreset($(this).val());
-                });
+                var presetElement = $preset.get(0);
+                if (presetElement) {
+                    presetElement.addEventListener('change', function () {
+                        if (presetSyncingUi) {
+                            return;
+                        }
+                        applyPreset(this.value);
+                    });
+                }
 
-                $contentMain.on(
-                    'change input select2:select select2:unselect',
-                    '.embedded-advanced-fields :input, .inline-group :input',
-                    markPresetCustom
-                );
+                function bindAdvancedFieldListeners() {
+                    watchedFields.forEach(function (fieldName) {
+                        var namedFields = document.querySelectorAll('[name="' + fieldName + '"]');
+                        if (!namedFields.length) {
+                            return;
+                        }
+                        namedFields.forEach(function (field) {
+                            field.removeEventListener('change', markPresetCustom);
+                            field.removeEventListener('input', markPresetCustom);
+                            field.addEventListener('change', markPresetCustom);
+                            field.addEventListener('input', markPresetCustom);
+                        });
+                    });
+                    $contentMain.off('.embeddedPreset');
+                    $contentMain.on(
+                        'change.embeddedPreset input.embeddedPreset click.embeddedPreset',
+                        '.embedded-advanced-fields :input, .inline-group :input',
+                        schedulePresetRefresh
+                    );
+                }
 
                 var $presetRow = $('.form-row.field-creation_preset, .field-creation_preset').first();
                 if (!$presetRow.length && $preset.length) {
@@ -319,6 +378,7 @@
                 } else {
                     setPresetValue($preset.val() || 'custom');
                 }
+                bindAdvancedFieldListeners();
                 updateAdvancedVisibility();
             {% endif %}
         });
