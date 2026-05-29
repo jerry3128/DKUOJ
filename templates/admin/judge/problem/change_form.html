@@ -4,8 +4,8 @@
 {% block extrastyle %}{{ block.super }}
     {% if show_embedded_advanced_toggle %}
         <style>
-            #content-main .embedded-advanced-fields,
-            #content-main .inline-group {
+            #content-main.advanced-collapsed .embedded-advanced-fields,
+            #content-main.advanced-collapsed .inline-group {
                 max-height: 0;
                 overflow: hidden;
                 opacity: 0;
@@ -17,8 +17,8 @@
                 pointer-events: none;
             }
 
-            #content-main.advanced-open .embedded-advanced-fields,
-            #content-main.advanced-open .inline-group {
+            #content-main .embedded-advanced-fields,
+            #content-main .inline-group {
                 max-height: 2000px;
                 opacity: 1;
                 overflow: hidden;
@@ -55,7 +55,7 @@
                 var syncingPreset = false;
 
                 function updateAdvancedVisibility() {
-                    $contentMain.toggleClass('advanced-open', advancedOpen);
+                    $contentMain.toggleClass('advanced-collapsed', !advancedOpen);
                     $advancedButton.text(
                         advancedOpen ? '{{ _("Hide advanced settings")|escapejs }}' : '{{ _("Advanced")|escapejs }}'
                     );
@@ -254,6 +254,9 @@
                 $advancedButton.on('click', function () {
                     advancedOpen = !advancedOpen;
                     updateAdvancedVisibility();
+                    if (advancedOpen && $preset.val() === 'default') {
+                        applyPreset('default');
+                    }
                 });
 
                 $preset.on('change', function () {
@@ -276,6 +279,7 @@
                 } else {
                     updatePresetFromAdvancedFields();
                 }
+                $contentMain.toggleClass('advanced-collapsed', !advancedOpen);
                 updateAdvancedVisibility();
             {% endif %}
         });
