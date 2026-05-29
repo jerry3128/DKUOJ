@@ -1,3 +1,4 @@
+import re
 from operator import attrgetter
 
 from django import forms
@@ -8,6 +9,7 @@ from django.db import transaction
 from django.forms import ModelForm
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.text import slugify
 from django.utils.html import format_html
 from django.utils.translation import gettext, gettext_lazy as _, ngettext
 from reversion.admin import VersionAdmin
@@ -18,37 +20,6 @@ from judge.models import Class, Language, LanguageLimit, Problem, ProblemClarifi
 from judge.utils.views import NoBatchDeleteMixin
 from judge.widgets import AdminHeavySelect2MultipleWidget, AdminMartorWidget, AdminSelect2MultipleWidget, \
     AdminSelect2Widget, CheckboxSelectMultipleWithSelectAll
-
-
-class SimpleProblemCreationForm(ModelForm):
-    CREATION_PRESET_ALL_CLOSED = 'all_closed'
-
-    creation_preset = forms.ChoiceField(
-        label=_('Creation preset'),
-        required=False,
-        initial=CREATION_PRESET_ALL_CLOSED,
-        choices=((CREATION_PRESET_ALL_CLOSED, _('All closed')),),
-        help_text=_('Automatically applies defaults for all other problem settings.'),
-    )
-
-    class Meta:
-        model = Problem
-        fields = ('code', 'name', 'description')
-        widgets = {
-            'description': AdminMartorWidget(attrs={'data-markdownfy-url': reverse_lazy('problem_preview')}),
-        }
-
-    def clean(self):
-        cleaned_data = super().clean()
-
-        if getattr(self, 'default_group', None) is None:
-            raise forms.ValidationError(_('You must create at least one problem group before creating a problem.'))
-        if getattr(self, 'default_type', None) is None:
-            raise forms.ValidationError(_('You must create at least one problem type before creating a problem.'))
-        if not getattr(self, 'default_languages', None):
-            raise forms.ValidationError(_('You must configure at least one language before creating a problem.'))
-
-        return cleaned_data
 
 
 class ProblemForm(ModelForm):
@@ -95,6 +66,62 @@ class ProblemForm(ModelForm):
             'group': AdminSelect2Widget,
             'description': AdminMartorWidget(attrs={'data-markdownfy-url': reverse_lazy('problem_preview')}),
         }
+
+
+class SimpleProblemCreationForm(ProblemForm):
+    CREATION_PRESET_ALL_CLOSED = 'all_closed'
+    advanced_required_fields = ('code', 'group', 'time_limit', 'memory_limit', 'points')
+    advanced_required_m2m_fields = ('types', 'allowed_languages')
+
+    creation_preset = forms.ChoiceField(
+        label=_('Creation preset'),
+        required=False,
+        initial=CREATION_PRESET_ALL_CLOSED,
+        choices=((CREATION_PRESET_ALL_CLOSED, _('All closed')),),
+        help_text=_('Automatically applies defaults for all other problem settings.'),
+    )
+    embedded_advanced_mode = forms.BooleanField(required=False, widget=forms.HiddenInput())
+
+    class Meta(ProblemForm.Meta):
+        model = Problem
+        fields = (
+            'code', 'name', 'is_public', 'is_manually_managed', 'date', 'authors', 'curators', 'testers',
+            'organizations', 'classes', 'submission_source_visibility_mode', 'is_full_markup',
+            'view_test_cases', 'view_tester', 'ai_hints_enabled', 'description', 'license', 'og_image', 'summary',
+            'types', 'group', 'points', 'partial', 'short_circuit', 'time_limit', 'memory_limit',
+            'allowed_languages', 'banned_users',
+        )
+
+    def __init__(self, *args, **kwargs):
+        super(SimpleProblemCreationForm, self).__init__(*args, **kwargs)
+        for field_name in (
+            'code', 'is_public', 'is_manually_managed', 'date', 'authors', 'curators', 'testers', 'organizations',
+            'classes', 'submission_source_visibility_mode', 'is_full_markup', 'view_test_cases', 'view_tester',
+            'ai_hints_enabled', 'license', 'og_image', 'summary', 'types', 'group', 'points', 'partial',
+            'short_circuit', 'time_limit', 'memory_limit', 'allowed_languages', 'banned_users',
+        ):
+            self.fields[field_name].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        advanced_mode = cleaned_data.get('embedded_advanced_mode')
+
+        if getattr(self, 'default_group', None) is None:
+            raise forms.ValidationError(_('You must create at least one problem group before creating a problem.'))
+        if getattr(self, 'default_type', None) is None:
+            raise forms.ValidationError(_('You must create at least one problem type before creating a problem.'))
+        if not getattr(self, 'default_languages', None):
+            raise forms.ValidationError(_('You must configure at least one language before creating a problem.'))
+
+        if advanced_mode:
+            for field_name in self.advanced_required_fields:
+                if not cleaned_data.get(field_name):
+                    self.add_error(field_name, _('This field is required in advanced mode.'))
+            for field_name in self.advanced_required_m2m_fields:
+                if not cleaned_data.get(field_name):
+                    self.add_error(field_name, _('This field is required in advanced mode.'))
+
+        return cleaned_data
 
 
 class ProblemCreatorListFilter(admin.SimpleListFilter):
@@ -180,7 +207,43 @@ class ProblemTemplateInline(admin.StackedInline):
 class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
     add_fieldsets = (
         (None, {
-            'fields': ('code', 'name', 'description', 'creation_preset'),
+            'fields': ('name', 'description', 'creation_preset'),
+        }),
+        (_('Advanced'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': (
+                'code', 'is_public', 'is_manually_managed', 'date', 'authors', 'curators', 'testers',
+                'organizations', 'classes', 'submission_source_visibility_mode', 'is_full_markup',
+                'view_test_cases', 'view_tester', 'ai_hints_enabled', 'license',
+            ),
+        }),
+        (_('Advanced Social Media'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': ('og_image', 'summary'),
+        }),
+        (_('Advanced Taxonomy'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': ('types', 'group'),
+        }),
+        (_('Advanced Points'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': (('points', 'partial'), 'short_circuit'),
+        }),
+        (_('Advanced Limits'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': ('time_limit', 'memory_limit'),
+        }),
+        (_('Advanced Language'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': ('allowed_languages',),
+        }),
+        (_('Advanced Justice'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': ('banned_users',),
+        }),
+        (_('Advanced History'), {
+            'classes': ('embedded-advanced-fields',),
+            'fields': ('change_message',),
         }),
     )
     fieldsets = (
@@ -213,7 +276,12 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
     date_hierarchy = 'date'
 
     def is_advanced_add_mode(self, request, obj=None):
-        return obj is None and (request.GET.get('advanced') == '1' or request.POST.get('_advanced_mode') == '1')
+        if request.POST.get('_advanced_mode') == '1':
+            return True
+        return obj is None and request.GET.get('advanced') == '1'
+
+    def is_embedded_advanced_mode(self, request, obj=None):
+        return request.POST.get('embedded_advanced_mode') in ('1', 'on', 'true', 'True')
 
     def get_actions(self, request):
         actions = super(ProblemAdmin, self).get_actions(request)
@@ -249,7 +317,20 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
     def get_default_points(self):
         return max(1, settings.DMOJ_PROBLEM_MIN_PROBLEM_POINTS)
 
+    def generate_problem_code(self, name):
+        base = re.sub(r'[^a-z0-9]', '', slugify(name).lower())[:20] or 'problem'
+        code = base
+        suffix = 2
+
+        while Problem.objects.filter(code=code).exists():
+            suffix_str = str(suffix)
+            code = '{}{}'.format(base[:20 - len(suffix_str)], suffix_str)
+            suffix += 1
+
+        return code
+
     def apply_creation_defaults(self, request, obj):
+        obj.code = self.generate_problem_code(obj.name)
         obj.group = self.get_default_group()
         obj.time_limit = self.get_default_time_limit()
         obj.memory_limit = self.get_default_memory_limit()
@@ -275,8 +356,6 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         return super().get_fieldsets(request, obj)
 
     def get_inline_instances(self, request, obj=None):
-        if obj is None and not self.is_advanced_add_mode(request, obj):
-            return []
         return super().get_inline_instances(request, obj)
 
     def get_readonly_fields(self, request, obj=None):
@@ -368,10 +447,13 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         context['show_advanced_add_button'] = add and not self.is_advanced_add_mode(request, obj)
         context['advanced_add_url'] = '{}?advanced=1'.format(request.path)
         context['is_advanced_add'] = add and self.is_advanced_add_mode(request, obj)
+        context['is_embedded_advanced_mode'] = add and not self.is_advanced_add_mode(request, obj) and (
+            self.is_embedded_advanced_mode(request, obj)
+        )
         return super().render_change_form(request, context, add, change, form_url, obj)
 
     def save_model(self, request, obj, form, change):
-        if not change and not self.is_advanced_add_mode(request, obj):
+        if not change and not self.is_advanced_add_mode(request, obj) and not self.is_embedded_advanced_mode(request, obj):
             self.apply_creation_defaults(request, obj)
 
         # `organizations` and `classes` will not appear in `cleaned_data` if user cannot edit them
@@ -396,7 +478,7 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
-        if change or self.is_advanced_add_mode(request, form.instance):
+        if change or self.is_advanced_add_mode(request, form.instance) or self.is_embedded_advanced_mode(request, form.instance):
             return
 
         problem = form.instance

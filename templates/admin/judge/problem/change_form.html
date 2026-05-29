@@ -8,6 +8,26 @@
             $('.problem-votes-link').appendTo('div#bottombar').show();
             $('.test-data-link').appendTo('div#bottombar').show();
             $('.clone-problem-link').appendTo('div#bottombar').show();
+
+            {% if show_advanced_add_button %}
+                var advancedOpen = {{ is_embedded_advanced_mode|yesno:"true,false" }};
+                var $advancedToggleInput = $('#id_embedded_advanced_mode');
+                var $advancedSections = $('.embedded-advanced-fields, .inline-group');
+                var $advancedButton = $('#embedded-advanced-toggle');
+
+                function updateAdvancedVisibility() {
+                    $advancedSections.toggle(advancedOpen);
+                    $advancedButton.text(advancedOpen ? '{{ _("Hide advanced")|escapejs }}' : '{{ _("Advanced")|escapejs }}');
+                    $advancedToggleInput.val(advancedOpen ? '1' : '');
+                }
+
+                $advancedButton.on('click', function () {
+                    advancedOpen = !advancedOpen;
+                    updateAdvancedVisibility();
+                });
+
+                updateAdvancedVisibility();
+            {% endif %}
         });
     </script>
 {% endblock extrahead %}
@@ -16,10 +36,16 @@
     {{ block.super }}
     {% if is_advanced_add %}
         <input type="hidden" name="_advanced_mode" value="1">
+    {% elif show_advanced_add_button %}
+        {{ adminform.form.embedded_advanced_mode }}
     {% endif %}
+{% endblock %}
+
+{% block after_related_objects %}
+    {{ block.super }}
     {% if show_advanced_add_button %}
-        <div style="margin-bottom: 16px;">
-            <a class="button" href="{{ advanced_add_url }}">{{ _('Advanced') }}</a>
+        <div style="margin-top: 16px;">
+            <button class="button" id="embedded-advanced-toggle" type="button">{{ _('Advanced') }}</button>
         </div>
     {% endif %}
 {% endblock %}
