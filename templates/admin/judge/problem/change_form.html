@@ -11,7 +11,9 @@
 
             {% if show_embedded_advanced_toggle %}
                 var advancedOpen = {{ is_embedded_advanced_mode|yesno:"true,false" }};
-                var presetDefaults = {{ simple_preset_defaults|safe }};
+                var presetConfig = {{ simple_preset_defaults|safe }};
+                var presetDefaults = presetConfig.values || {};
+                var presetDisplay = presetConfig.display || {};
                 var $advancedToggleInput = $('#id_embedded_advanced_mode');
                 var $advancedSections = $('.embedded-advanced-fields, .inline-group');
                 var $advancedButton = $('#embedded-advanced-toggle');
@@ -24,11 +26,11 @@
                     'allowed_languages', 'banned_users'
                 ];
                 var syncingPreset = false;
-                var defaultAutofilledCode = currentValue('code');
-
                 function updateAdvancedVisibility() {
                     $advancedSections.toggle(advancedOpen);
-                    $advancedButton.text(advancedOpen ? '{{ _("Hide advanced")|escapejs }}' : '{{ _("Advanced")|escapejs }}');
+                    $advancedButton.text(
+                        advancedOpen ? '{{ _("Hide advanced settings")|escapejs }}' : '{{ _("Advanced")|escapejs }}'
+                    );
                     $advancedToggleInput.val(advancedOpen ? '1' : '');
                 }
 
@@ -76,6 +78,18 @@
                     if (!$field.length) {
                         return;
                     }
+                    if ($field.is('select')) {
+                        var displayValue = presetDisplay[fieldName];
+                        if ($.isArray(displayValue)) {
+                            displayValue.forEach(function (item) {
+                                if ($field.find('option[value="' + item.id + '"]').length === 0) {
+                                    $field.append(new Option(item.text, item.id, false, false));
+                                }
+                            });
+                        } else if (displayValue && $field.find('option[value="' + displayValue.id + '"]').length === 0) {
+                            $field.append(new Option(displayValue.text, displayValue.id, false, false));
+                        }
+                    }
                     if ($field.is(':checkbox')) {
                         $field.prop('checked', !!value).trigger('change');
                         return;
@@ -91,13 +105,11 @@
                     var fallbackCode = presetDefaults.code == null ? '' : String(presetDefaults.code);
                     if (typeof window.DKUOJAutofillProblemCode === 'function') {
                         return window.DKUOJAutofillProblemCode().then(function (generatedCode) {
-                            defaultAutofilledCode = generatedCode || fallbackCode;
-                            presetDefaults.code = defaultAutofilledCode;
-                            return defaultAutofilledCode;
+                            presetDefaults.code = generatedCode || fallbackCode;
+                            return presetDefaults.code;
                         });
                     }
                     setFieldValue('code', fallbackCode);
-                    defaultAutofilledCode = fallbackCode;
                     presetDefaults.code = fallbackCode;
                     return Promise.resolve(fallbackCode);
                 }
@@ -126,7 +138,7 @@
                     var isCustomized = watchedFields.some(function (fieldName) {
                         return currentValue(fieldName) !== normalizedValue(fieldName);
                     });
-                    $preset.val(isCustomized ? 'customized' : 'default');
+                    $preset.val(isCustomized ? 'custom' : 'default');
                 }
 
                 $advancedButton.on('click', function () {

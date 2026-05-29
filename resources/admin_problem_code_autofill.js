@@ -6,11 +6,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const isOriginalAdvancedPage = url.searchParams.get('advanced') === '1' ||
         document.querySelector('input[name="_advanced_mode"][value="1"]');
 
-    // 只在原始 advanced add 页面并且当前 code 为空时自动填充
     const isAddPage = window.location.pathname.endsWith('/add/');
     if (!isAddPage) return;
-    if (!isOriginalAdvancedPage) return;
-    if (codeInput.value.trim() !== '') return;
 
     async function checkProblemCode(code) {
         if (!code || code.trim() === '') {
@@ -67,10 +64,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     window.DKUOJAutofillProblemCode = autofillProblemCode;
-
-    codeInput.addEventListener('dkuoj:autofill-code', function () {
+    if (isOriginalAdvancedPage && codeInput.value.trim() === '') {
         autofillProblemCode();
-    });
-
-    autofillProblemCode();
+    }
 });

@@ -71,7 +71,7 @@ class ProblemForm(ModelForm):
 
 class SimpleProblemCreationForm(ProblemForm):
     CREATION_PRESET_DEFAULT = 'default'
-    CREATION_PRESET_CUSTOMIZED = 'customized'
+    CREATION_PRESET_CUSTOM = 'custom'
     advanced_required_fields = ('code', 'group', 'time_limit', 'memory_limit', 'points')
     advanced_required_m2m_fields = ('types', 'allowed_languages')
 
@@ -81,7 +81,7 @@ class SimpleProblemCreationForm(ProblemForm):
         initial=CREATION_PRESET_DEFAULT,
         choices=(
             (CREATION_PRESET_DEFAULT, _('Default')),
-            (CREATION_PRESET_CUSTOMIZED, _('Customized')),
+            (CREATION_PRESET_CUSTOM, _('Custom')),
         ),
         help_text=_('Presets can automatically fill advanced settings.'),
     )
@@ -108,7 +108,7 @@ class SimpleProblemCreationForm(ProblemForm):
             self.fields[field_name].required = False
         self.fields['creation_preset'].choices = (
             (self.CREATION_PRESET_DEFAULT, _('Default')),
-            (self.CREATION_PRESET_CUSTOMIZED, _('Customized')),
+            (self.CREATION_PRESET_CUSTOM, _('Custom')),
         )
 
     def clean(self):
@@ -130,7 +130,7 @@ class SimpleProblemCreationForm(ProblemForm):
                 if not cleaned_data.get(field_name):
                     self.add_error(field_name, _('This field is required in advanced mode.'))
         else:
-            cleaned_data['code'] = getattr(self, 'generated_simple_code', cleaned_data.get('code'))
+            cleaned_data['code'] = cleaned_data.get('code') or getattr(self, 'generated_simple_code', '')
             cleaned_data['is_public'] = False
             cleaned_data['is_manually_managed'] = False
             cleaned_data['date'] = None
@@ -360,37 +360,45 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         default_type = self.get_default_type()
         default_languages = self.get_default_languages()
         default_code = self.generate_problem_code(request.POST.get('name') or '')
+        profile = getattr(request.user, 'profile', None)
         return {
-            'code': default_code,
-            'is_public': False,
-            'is_manually_managed': False,
-            'date': '',
-            'authors': [request.user.profile.id] if hasattr(request.user, 'profile') else [],
-            'curators': [],
-            'testers': [],
-            'organizations': [],
-            'classes': [],
-            'submission_source_visibility_mode': SubmissionSourceAccess.FOLLOW,
-            'is_full_markup': False,
-            'view_test_cases': False,
-            'view_tester': False,
-            'ai_hints_enabled': False,
-            'license': '',
-            'og_image': '',
-            'summary': '',
-            'types': [default_type.id] if default_type else [],
-            'group': str(default_group.id) if default_group else '',
-            'points': str(self.get_default_points()),
-            'partial': False,
-            'short_circuit': False,
-            'time_limit': str(self.get_default_time_limit()),
-            'memory_limit': str(self.get_default_memory_limit()),
-            'allowed_languages': [lang.id for lang in default_languages],
-            'banned_users': [],
+            'values': {
+                'code': default_code,
+                'is_public': False,
+                'is_manually_managed': False,
+                'date': '',
+                'authors': [profile.id] if profile else [],
+                'curators': [],
+                'testers': [],
+                'organizations': [],
+                'classes': [],
+                'submission_source_visibility_mode': SubmissionSourceAccess.FOLLOW,
+                'is_full_markup': False,
+                'view_test_cases': False,
+                'view_tester': False,
+                'ai_hints_enabled': False,
+                'license': '',
+                'og_image': '',
+                'summary': '',
+                'types': [default_type.id] if default_type else [],
+                'group': str(default_group.id) if default_group else '',
+                'points': str(self.get_default_points()),
+                'partial': False,
+                'short_circuit': False,
+                'time_limit': str(self.get_default_time_limit()),
+                'memory_limit': str(self.get_default_memory_limit()),
+                'allowed_languages': [lang.id for lang in default_languages],
+                'banned_users': [],
+            },
+            'display': {
+                'authors': [{'id': str(profile.id), 'text': profile.user.username}] if profile else [],
+                'types': [{'id': str(default_type.id), 'text': str(default_type)}] if default_type else [],
+                'group': {'id': str(default_group.id), 'text': str(default_group)} if default_group else None,
+            },
         }
 
     def apply_creation_defaults(self, request, obj):
-        obj.code = self.generate_problem_code(obj.name)
+        obj.code = obj.code or self.generate_problem_code(obj.name)
         obj.group = self.get_default_group()
         obj.time_limit = self.get_default_time_limit()
         obj.memory_limit = self.get_default_memory_limit()

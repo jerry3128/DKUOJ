@@ -23,7 +23,7 @@ class ProblemAdminCreationTestCase(CommonDataMixin, TestCase):
         self.assertContains(response, 'name="description"', html=False)
         self.assertContains(response, 'name="creation_preset"', html=False)
         self.assertContains(response, 'value="default"', html=False)
-        self.assertContains(response, 'value="customized"', html=False)
+        self.assertContains(response, 'value="custom"', html=False)
         self.assertContains(response, 'id="embedded-advanced-toggle"', html=False)
         self.assertContains(response, 'name="embedded_advanced_mode"', html=False)
 
@@ -61,7 +61,7 @@ class ProblemAdminCreationTestCase(CommonDataMixin, TestCase):
     def test_admin_embedded_advanced_mode_can_use_manual_settings(self):
         response = self.client.post(reverse('admin:judge_problem_add'), data={
             'embedded_advanced_mode': '1',
-            'creation_preset': 'customized',
+            'creation_preset': 'custom',
             'code': 'manualcode',
             'name': 'Manual Problem',
             'description': 'Problem statement',
