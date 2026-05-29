@@ -9,11 +9,22 @@
             $('.test-data-link').appendTo('div#bottombar').show();
             $('.clone-problem-link').appendTo('div#bottombar').show();
 
-            {% if show_advanced_add_button %}
+            {% if show_embedded_advanced_toggle %}
                 var advancedOpen = {{ is_embedded_advanced_mode|yesno:"true,false" }};
+                var presetDefaults = {{ simple_preset_defaults|safe }};
                 var $advancedToggleInput = $('#id_embedded_advanced_mode');
                 var $advancedSections = $('.embedded-advanced-fields, .inline-group');
                 var $advancedButton = $('#embedded-advanced-toggle');
+                var $preset = $('#id_creation_preset');
+                var watchedFields = [
+                    'code', 'is_public', 'is_manually_managed', 'date', 'authors', 'curators', 'testers',
+                    'organizations', 'classes', 'submission_source_visibility_mode', 'is_full_markup',
+                    'view_test_cases', 'view_tester', 'ai_hints_enabled', 'license', 'og_image', 'summary',
+                    'types', 'group', 'points', 'partial', 'short_circuit', 'time_limit', 'memory_limit',
+                    'allowed_languages', 'banned_users'
+                ];
+                var syncingPreset = false;
+                var defaultAutofilledCode = currentValue('code');
 
                 function updateAdvancedVisibility() {
                     $advancedSections.toggle(advancedOpen);
@@ -21,11 +32,135 @@
                     $advancedToggleInput.val(advancedOpen ? '1' : '');
                 }
 
+                function normalizedValue(fieldName) {
+                    var defaultValue = presetDefaults[fieldName];
+                    if ($.isArray(defaultValue)) {
+                        return defaultValue.map(String).sort().join(',');
+                    }
+                    if (typeof defaultValue === 'boolean') {
+                        return defaultValue ? '1' : '0';
+                    }
+                    return defaultValue == null ? '' : String(defaultValue);
+                }
+
+                function currentValue(fieldName) {
+                    var $field = $('#id_' + fieldName);
+                    var $checkboxGroup = $('input[name="' + fieldName + '"]');
+                    if ($checkboxGroup.length) {
+                        return $checkboxGroup.filter(':checked').map(function () {
+                            return String(this.value);
+                        }).get().sort().join(',');
+                    }
+                    if (!$field.length) {
+                        return '';
+                    }
+                    if ($field.is(':checkbox')) {
+                        return $field.is(':checked') ? '1' : '0';
+                    }
+                    if ($field.is('select[multiple]')) {
+                        return (($field.val() || []).map(String).sort().join(','));
+                    }
+                    return String($field.val() || '');
+                }
+
+                function setFieldValue(fieldName, value) {
+                    var $field = $('#id_' + fieldName);
+                    var $checkboxGroup = $('input[name="' + fieldName + '"]');
+                    if ($checkboxGroup.length) {
+                        var targetValues = (value || []).map(String);
+                        $checkboxGroup.each(function () {
+                            $(this).prop('checked', targetValues.indexOf(String(this.value)) !== -1);
+                        }).trigger('change');
+                        return;
+                    }
+                    if (!$field.length) {
+                        return;
+                    }
+                    if ($field.is(':checkbox')) {
+                        $field.prop('checked', !!value).trigger('change');
+                        return;
+                    }
+                    if ($field.is('select[multiple]')) {
+                        $field.val((value || []).map(String)).trigger('change');
+                        return;
+                    }
+                    $field.val(value == null ? '' : value).trigger('change');
+                }
+
+                function requestAutofillCode() {
+                    var fallbackCode = presetDefaults.code == null ? '' : String(presetDefaults.code);
+                    if (typeof window.DKUOJAutofillProblemCode === 'function') {
+                        return window.DKUOJAutofillProblemCode().then(function (generatedCode) {
+                            defaultAutofilledCode = generatedCode || fallbackCode;
+                            presetDefaults.code = defaultAutofilledCode;
+                            return defaultAutofilledCode;
+                        });
+                    }
+                    setFieldValue('code', fallbackCode);
+                    defaultAutofilledCode = fallbackCode;
+                    presetDefaults.code = fallbackCode;
+                    return Promise.resolve(fallbackCode);
+                }
+
+                function applyPreset(presetName) {
+                    if (presetName !== 'default') {
+                        return;
+                    }
+                    syncingPreset = true;
+                    watchedFields.forEach(function (fieldName) {
+                        if (fieldName === 'code') {
+                            return;
+                        }
+                        setFieldValue(fieldName, presetDefaults[fieldName]);
+                    });
+                    requestAutofillCode().finally(function () {
+                        syncingPreset = false;
+                        updatePresetFromAdvancedFields();
+                    });
+                }
+
+                function updatePresetFromAdvancedFields() {
+                    if (syncingPreset) {
+                        return;
+                    }
+                    var isCustomized = watchedFields.some(function (fieldName) {
+                        return currentValue(fieldName) !== normalizedValue(fieldName);
+                    });
+                    $preset.val(isCustomized ? 'customized' : 'default');
+                }
+
                 $advancedButton.on('click', function () {
                     advancedOpen = !advancedOpen;
                     updateAdvancedVisibility();
                 });
 
+                $preset.on('change', function () {
+                    if ($(this).val() === 'default') {
+                        applyPreset('default');
+                    }
+                });
+
+                $('#id_name').on('input', function () {
+                    if ($preset.val() === 'default') {
+                        syncingPreset = true;
+                        requestAutofillCode().finally(function () {
+                            syncingPreset = false;
+                            updatePresetFromAdvancedFields();
+                        });
+                    } else {
+                        updatePresetFromAdvancedFields();
+                    }
+                });
+
+                watchedFields.forEach(function (fieldName) {
+                    $('#id_' + fieldName).on('change input', updatePresetFromAdvancedFields);
+                });
+
+                if ($preset.val() === 'default') {
+                    applyPreset('default');
+                } else {
+                    updatePresetFromAdvancedFields();
+                }
                 updateAdvancedVisibility();
             {% endif %}
         });
@@ -36,14 +171,14 @@
     {{ block.super }}
     {% if is_advanced_add %}
         <input type="hidden" name="_advanced_mode" value="1">
-    {% elif show_advanced_add_button %}
+    {% elif show_embedded_advanced_toggle %}
         {{ adminform.form.embedded_advanced_mode }}
     {% endif %}
 {% endblock %}
 
 {% block after_related_objects %}
     {{ block.super }}
-    {% if show_advanced_add_button %}
+    {% if show_embedded_advanced_toggle %}
         <div style="margin-top: 16px;">
             <button class="button" id="embedded-advanced-toggle" type="button">{{ _('Advanced') }}</button>
         </div>

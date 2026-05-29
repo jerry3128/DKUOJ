@@ -2,9 +2,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const codeInput = document.getElementById('id_code');
     if (!codeInput) return;
 
-    // 只在 add 页面并且当前 code 为空时自动填充
+    const url = new URL(window.location.href);
+    const isOriginalAdvancedPage = url.searchParams.get('advanced') === '1' ||
+        document.querySelector('input[name="_advanced_mode"][value="1"]');
+
+    // 只在原始 advanced add 页面并且当前 code 为空时自动填充
     const isAddPage = window.location.pathname.endsWith('/add/');
     if (!isAddPage) return;
+    if (!isOriginalAdvancedPage) return;
     if (codeInput.value.trim() !== '') return;
 
     async function checkProblemCode(code) {
@@ -49,14 +54,23 @@ document.addEventListener('DOMContentLoaded', function () {
         return `clone${timestamp}`;
     }
 
-    async function initialize() {
+    async function autofillProblemCode() {
         try {
             const uniqueCode = await generateUniqueCloneCode();
             codeInput.value = uniqueCode;
+            codeInput.dispatchEvent(new Event('change', {bubbles: true}));
+            return uniqueCode;
         } catch (error) {
             console.error('Failed to generate code:', error);
+            return null;
         }
     }
 
-    initialize();
+    window.DKUOJAutofillProblemCode = autofillProblemCode;
+
+    codeInput.addEventListener('dkuoj:autofill-code', function () {
+        autofillProblemCode();
+    });
+
+    autofillProblemCode();
 });

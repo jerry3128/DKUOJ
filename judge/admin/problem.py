@@ -1,3 +1,4 @@
+import json
 import re
 from operator import attrgetter
 
@@ -69,16 +70,20 @@ class ProblemForm(ModelForm):
 
 
 class SimpleProblemCreationForm(ProblemForm):
-    CREATION_PRESET_ALL_CLOSED = 'all_closed'
+    CREATION_PRESET_DEFAULT = 'default'
+    CREATION_PRESET_CUSTOMIZED = 'customized'
     advanced_required_fields = ('code', 'group', 'time_limit', 'memory_limit', 'points')
     advanced_required_m2m_fields = ('types', 'allowed_languages')
 
     creation_preset = forms.ChoiceField(
         label=_('Creation preset'),
         required=False,
-        initial=CREATION_PRESET_ALL_CLOSED,
-        choices=((CREATION_PRESET_ALL_CLOSED, _('All closed')),),
-        help_text=_('Automatically applies defaults for all other problem settings.'),
+        initial=CREATION_PRESET_DEFAULT,
+        choices=(
+            (CREATION_PRESET_DEFAULT, _('Default')),
+            (CREATION_PRESET_CUSTOMIZED, _('Customized')),
+        ),
+        help_text=_('Presets can automatically fill advanced settings.'),
     )
     embedded_advanced_mode = forms.BooleanField(required=False, widget=forms.HiddenInput())
 
@@ -101,6 +106,10 @@ class SimpleProblemCreationForm(ProblemForm):
             'short_circuit', 'time_limit', 'memory_limit', 'allowed_languages', 'banned_users',
         ):
             self.fields[field_name].required = False
+        self.fields['creation_preset'].choices = (
+            (self.CREATION_PRESET_DEFAULT, _('Default')),
+            (self.CREATION_PRESET_CUSTOMIZED, _('Customized')),
+        )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -120,6 +129,25 @@ class SimpleProblemCreationForm(ProblemForm):
             for field_name in self.advanced_required_m2m_fields:
                 if not cleaned_data.get(field_name):
                     self.add_error(field_name, _('This field is required in advanced mode.'))
+        else:
+            cleaned_data['code'] = getattr(self, 'generated_simple_code', cleaned_data.get('code'))
+            cleaned_data['is_public'] = False
+            cleaned_data['is_manually_managed'] = False
+            cleaned_data['date'] = None
+            cleaned_data['submission_source_visibility_mode'] = SubmissionSourceAccess.FOLLOW
+            cleaned_data['is_full_markup'] = False
+            cleaned_data['view_test_cases'] = False
+            cleaned_data['view_tester'] = False
+            cleaned_data['ai_hints_enabled'] = False
+            cleaned_data['license'] = None
+            cleaned_data['og_image'] = ''
+            cleaned_data['summary'] = ''
+            cleaned_data['group'] = self.default_group
+            cleaned_data['points'] = self.default_points
+            cleaned_data['partial'] = False
+            cleaned_data['short_circuit'] = False
+            cleaned_data['time_limit'] = self.default_time_limit
+            cleaned_data['memory_limit'] = self.default_memory_limit
 
         return cleaned_data
 
@@ -321,13 +349,45 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         base = re.sub(r'[^a-z0-9]', '', slugify(name).lower())[:20] or 'problem'
         code = base
         suffix = 2
-
         while Problem.objects.filter(code=code).exists():
             suffix_str = str(suffix)
             code = '{}{}'.format(base[:20 - len(suffix_str)], suffix_str)
             suffix += 1
-
         return code
+
+    def get_simple_preset_defaults(self, request):
+        default_group = self.get_default_group()
+        default_type = self.get_default_type()
+        default_languages = self.get_default_languages()
+        default_code = self.generate_problem_code(request.POST.get('name') or '')
+        return {
+            'code': default_code,
+            'is_public': False,
+            'is_manually_managed': False,
+            'date': '',
+            'authors': [request.user.profile.id] if hasattr(request.user, 'profile') else [],
+            'curators': [],
+            'testers': [],
+            'organizations': [],
+            'classes': [],
+            'submission_source_visibility_mode': SubmissionSourceAccess.FOLLOW,
+            'is_full_markup': False,
+            'view_test_cases': False,
+            'view_tester': False,
+            'ai_hints_enabled': False,
+            'license': '',
+            'og_image': '',
+            'summary': '',
+            'types': [default_type.id] if default_type else [],
+            'group': str(default_group.id) if default_group else '',
+            'points': str(self.get_default_points()),
+            'partial': False,
+            'short_circuit': False,
+            'time_limit': str(self.get_default_time_limit()),
+            'memory_limit': str(self.get_default_memory_limit()),
+            'allowed_languages': [lang.id for lang in default_languages],
+            'banned_users': [],
+        }
 
     def apply_creation_defaults(self, request, obj):
         obj.code = self.generate_problem_code(obj.name)
@@ -354,9 +414,6 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         if obj is None and not self.is_advanced_add_mode(request, obj):
             return self.add_fieldsets
         return super().get_fieldsets(request, obj)
-
-    def get_inline_instances(self, request, obj=None):
-        return super().get_inline_instances(request, obj)
 
     def get_readonly_fields(self, request, obj=None):
         fields = self.readonly_fields
@@ -434,6 +491,11 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
             form.default_group = self.get_default_group()
             form.default_type = self.get_default_type()
             form.default_languages = self.get_default_languages()
+            form.default_points = self.get_default_points()
+            form.default_time_limit = self.get_default_time_limit()
+            form.default_memory_limit = self.get_default_memory_limit()
+            form.generated_simple_code = self.generate_problem_code(request.POST.get('name') or '')
+            form.simple_preset_defaults = self.get_simple_preset_defaults(request)
         if 'authors' in form.base_fields:
             form.base_fields['authors'].queryset = Profile.objects.all()
         if 'classes' in form.base_fields:
@@ -444,12 +506,13 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         js = ('admin_class_filter.js', 'admin_problem_code_autofill.js')
 
     def render_change_form(self, request, context, add=False, change=False, form_url='', obj=None):
-        context['show_advanced_add_button'] = add and not self.is_advanced_add_mode(request, obj)
-        context['advanced_add_url'] = '{}?advanced=1'.format(request.path)
+        context['show_embedded_advanced_toggle'] = add and not self.is_advanced_add_mode(request, obj)
         context['is_advanced_add'] = add and self.is_advanced_add_mode(request, obj)
         context['is_embedded_advanced_mode'] = add and not self.is_advanced_add_mode(request, obj) and (
             self.is_embedded_advanced_mode(request, obj)
         )
+        if context['show_embedded_advanced_toggle']:
+            context['simple_preset_defaults'] = json.dumps(self.get_simple_preset_defaults(request))
         return super().render_change_form(request, context, add, change, form_url, obj)
 
     def save_model(self, request, obj, form, change):
