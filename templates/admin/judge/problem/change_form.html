@@ -263,18 +263,6 @@
                     applyPreset($(this).val());
                 });
 
-                $('#id_name').on('input', function () {
-                    if ($preset.val() === 'default') {
-                        syncingPreset = true;
-                        requestAutofillCode().finally(function () {
-                            syncingPreset = false;
-                            updatePresetFromAdvancedFields();
-                        });
-                    } else {
-                        updatePresetFromAdvancedFields();
-                    }
-                });
-
                 watchedFields.forEach(function (fieldName) {
                     var $field = $('#id_' + fieldName);
                     var $checkboxGroup = $('input[name="' + fieldName + '"]');
