@@ -49,8 +49,8 @@ class ProblemAdminCreationTestCase(CommonDataMixin, TestCase):
         self.assertEqual(problem.code, 'simpleproblem')
         self.assertFalse(problem.is_public)
         self.assertEqual(problem.time_limit, 1)
-        self.assertEqual(problem.memory_limit, 65536)
-        self.assertEqual(problem.points, 1)
+        self.assertEqual(problem.memory_limit, 262144)
+        self.assertEqual(problem.points, 100)
         self.assertEqual(problem.group.name, 'default-group')
         self.assertCountEqual(problem.types.values_list('name', flat=True), ['default-type'])
         self.assertCountEqual(

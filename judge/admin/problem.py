@@ -340,10 +340,10 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
         return min(max(1, settings.DMOJ_PROBLEM_MIN_TIME_LIMIT), settings.DMOJ_PROBLEM_MAX_TIME_LIMIT)
 
     def get_default_memory_limit(self):
-        return min(max(65536, settings.DMOJ_PROBLEM_MIN_MEMORY_LIMIT), settings.DMOJ_PROBLEM_MAX_MEMORY_LIMIT)
+        return min(max(262144, settings.DMOJ_PROBLEM_MIN_MEMORY_LIMIT), settings.DMOJ_PROBLEM_MAX_MEMORY_LIMIT)
 
     def get_default_points(self):
-        return max(1, settings.DMOJ_PROBLEM_MIN_PROBLEM_POINTS)
+        return max(100, settings.DMOJ_PROBLEM_MIN_PROBLEM_POINTS)
 
     def generate_problem_code(self, name):
         base = re.sub(r'[^a-z0-9]', '', slugify(name).lower())[:20] or 'problem'

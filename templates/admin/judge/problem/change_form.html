@@ -1,6 +1,24 @@
 {% extends "admin/change_form.html" %}
 {% load i18n %}
 
+{% block extrastyle %}{{ block.super }}
+    {% if show_embedded_advanced_toggle %}
+        <style>
+            {% if is_embedded_advanced_mode %}
+                .embedded-advanced-fields,
+                .inline-group {
+                    display: block;
+                }
+            {% else %}
+                .embedded-advanced-fields,
+                .inline-group {
+                    display: none;
+                }
+            {% endif %}
+        </style>
+    {% endif %}
+{% endblock %}
+
 {% block extrahead %}{{ block.super }}
     <script type="text/javascript">
         django.jQuery(function ($) {
@@ -26,6 +44,21 @@
                     'allowed_languages', 'banned_users'
                 ];
                 var syncingPreset = false;
+
+                function waitForAutofillFunction(remainingAttempts) {
+                    if (typeof window.DKUOJAutofillProblemCode === 'function') {
+                        return Promise.resolve(window.DKUOJAutofillProblemCode);
+                    }
+                    if (remainingAttempts <= 0) {
+                        return Promise.resolve(null);
+                    }
+                    return new Promise(function (resolve) {
+                        window.setTimeout(function () {
+                            waitForAutofillFunction(remainingAttempts - 1).then(resolve);
+                        }, 100);
+                    });
+                }
+
                 function updateAdvancedVisibility() {
                     $advancedSections.toggle(advancedOpen);
                     $advancedButton.text(
@@ -103,15 +136,21 @@
 
                 function requestAutofillCode() {
                     var fallbackCode = presetDefaults.code == null ? '' : String(presetDefaults.code);
-                    if (typeof window.DKUOJAutofillProblemCode === 'function') {
-                        return window.DKUOJAutofillProblemCode().then(function (generatedCode) {
-                            presetDefaults.code = generatedCode || fallbackCode;
-                            return presetDefaults.code;
-                        });
-                    }
-                    setFieldValue('code', fallbackCode);
-                    presetDefaults.code = fallbackCode;
-                    return Promise.resolve(fallbackCode);
+                    return waitForAutofillFunction(20).then(function (autofillFn) {
+                        if (autofillFn) {
+                            return autofillFn().then(function (generatedCode) {
+                                presetDefaults.code = generatedCode || fallbackCode;
+                                return presetDefaults.code;
+                            });
+                        }
+                        setFieldValue('code', fallbackCode);
+                        presetDefaults.code = fallbackCode;
+                        return fallbackCode;
+                    }).catch(function () {
+                        setFieldValue('code', fallbackCode);
+                        presetDefaults.code = fallbackCode;
+                        return fallbackCode;
+                    });
                 }
 
                 function applyPreset(presetName) {
