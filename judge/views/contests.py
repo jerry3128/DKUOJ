@@ -467,6 +467,9 @@ class ContestJoin(LoginRequiredMixin, ContestMixin, SingleObjectMixin, View):
                     real_start=timezone.now(),
                 )
             else:
+                if requires_access_code:
+                    raise ContestAccessDenied()
+
                 if participation.ended:
                     participation = ContestParticipation.objects.get_or_create(
                         contest=contest, user=profile, virtual=SPECTATE,
