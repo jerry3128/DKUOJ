@@ -1,11 +1,13 @@
-document.addEventListener('DOMContentLoaded', function () {
+function initializeContestKeyAutofill() {
     const keyInput = document.getElementById('id_key');
     if (!keyInput) return;
 
-    // 只在 add 页面并且 key 为空时自动填充
+    const url = new URL(window.location.href);
+    const isOriginalAdvancedPage = url.searchParams.get('advanced') === '1' ||
+        document.querySelector('input[name="_advanced_mode"][value="1"]');
+
     const isAddPage = window.location.pathname.endsWith('/add/');
     if (!isAddPage) return;
-    if (keyInput.value.trim() !== '') return;
 
     async function checkContestKey(key) {
         if (!key || key.trim() === '') return null;
@@ -44,14 +46,29 @@ document.addEventListener('DOMContentLoaded', function () {
         return `contest${timestamp}`;
     }
 
-    async function init() {
+    async function autofillContestKey(options) {
+        const config = options || {};
         try {
             const key = await generateUniqueContestKey();
             keyInput.value = key;
+            if (!config.silent) {
+                keyInput.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+            return key;
         } catch (e) {
             console.error('Failed to generate contest key:', e);
+            return null;
         }
     }
 
-    init();
-});
+    window.DKUOJAutofillContestKey = autofillContestKey;
+    if (isOriginalAdvancedPage && keyInput.value.trim() === '') {
+        autofillContestKey();
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeContestKeyAutofill);
+} else {
+    initializeContestKeyAutofill();
+}

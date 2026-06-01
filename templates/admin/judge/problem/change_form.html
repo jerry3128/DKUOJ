@@ -1,6 +1,39 @@
 {% extends "admin/change_form.html" %}
 {% load i18n %}
 
+{% block extrastyle %}{{ block.super }}
+    {% if show_embedded_advanced_toggle %}
+        <style>
+            #content-main .embedded-advanced-fields,
+            #content-main .inline-group {
+                max-height: 0;
+                overflow: hidden;
+                opacity: 0;
+                margin-top: 0;
+                margin-bottom: 0;
+                padding-top: 0;
+                padding-bottom: 0;
+                border-width: 0;
+                pointer-events: none;
+            }
+
+            #content-main.advanced-expanded .embedded-advanced-fields,
+            #content-main.advanced-expanded .inline-group {
+                max-height: 2000px;
+                opacity: 1;
+                overflow: hidden;
+                margin-top: initial;
+                margin-bottom: initial;
+                padding-top: initial;
+                padding-bottom: initial;
+                border-width: initial;
+                pointer-events: auto;
+                transition: max-height 0.2s ease, opacity 0.15s ease;
+            }
+        </style>
+    {% endif %}
+{% endblock %}
+
 {% block extrahead %}{{ block.super }}
     <script type="text/javascript">
         django.jQuery(function ($) {
@@ -8,9 +41,361 @@
             $('.problem-votes-link').appendTo('div#bottombar').show();
             $('.test-data-link').appendTo('div#bottombar').show();
             $('.clone-problem-link').appendTo('div#bottombar').show();
+
+            {% if show_embedded_advanced_toggle %}
+                var advancedOpen = {{ is_embedded_advanced_mode|yesno:"true,false" }};
+                var presetConfig = {{ simple_preset_defaults|safe }};
+                var presetDefaults = presetConfig.values || {};
+                var presetDisplay = presetConfig.display || {};
+                var $advancedToggleInput = $('#id_embedded_advanced_mode');
+                var $contentMain = $('#content-main');
+                var $advancedButton = $('#embedded-advanced-toggle');
+                var $preset = $('#id_creation_preset');
+                var presetSyncingUi = false;
+                var suppressPresetCustom = false;
+                var watchedFields = [
+                    'code', 'is_public', 'is_manually_managed', 'date', 'authors', 'curators', 'testers',
+                    'organizations', 'classes', 'submission_source_visibility_mode', 'is_full_markup',
+                    'view_test_cases', 'view_tester', 'ai_hints_enabled', 'license', 'og_image', 'summary',
+                    'types', 'group', 'points', 'partial', 'short_circuit', 'time_limit', 'memory_limit',
+                    'allowed_languages', 'banned_users'
+                ];
+                function updateAdvancedVisibility() {
+                    $contentMain.toggleClass('advanced-expanded', advancedOpen);
+                    $advancedButton.text(
+                        advancedOpen ? '{{ _("Hide advanced settings")|escapejs }}' : '{{ _("Advanced")|escapejs }}'
+                    );
+                    $advancedToggleInput.val(advancedOpen ? '1' : '');
+                }
+
+                function forceTextboxValue($field, value, options) {
+                    var config = options || {};
+                    var triggerEvents = config.triggerEvents !== false;
+                    var nextValue = value == null ? '' : String(value);
+                    var domField = $field.get(0);
+                    function applyValue() {
+                        $field.val(nextValue);
+                        if (domField) {
+                            domField.value = nextValue;
+                            domField.defaultValue = nextValue;
+                            if (nextValue === '') {
+                                domField.removeAttribute('value');
+                            } else {
+                                domField.setAttribute('value', nextValue);
+                            }
+                            if (domField.tagName && domField.tagName.toLowerCase() === 'textarea') {
+                                domField.textContent = nextValue;
+                            }
+                        }
+                        if (triggerEvents) {
+                            $field.trigger('input').trigger('change').trigger('change.select2');
+                        }
+                    }
+                    applyValue();
+                    window.requestAnimationFrame(applyValue);
+                    window.setTimeout(applyValue, 0);
+                    window.setTimeout(applyValue, 50);
+                    window.setTimeout(applyValue, 150);
+                }
+
+                function getCodeField() {
+                    var $field = $('#id_code');
+                    if (!$field.length) {
+                        $field = $('[name="code"]');
+                    }
+                    return $field;
+                }
+
+                function overwriteCodeField(value) {
+                    var $codeField = getCodeField();
+                    if (!$codeField.length) {
+                        return;
+                    }
+                    forceTextboxValue($codeField, value, {triggerEvents: false});
+                }
+
+                function setFieldValue(fieldName, value) {
+                    if (fieldName === 'date') {
+                        forceTextboxValue($('#id_date_0'), '');
+                        forceTextboxValue($('#id_date_1'), '');
+                        return;
+                    }
+                    var $field = $('#id_' + fieldName);
+                    if (!$field.length) {
+                        $field = $('[name="' + fieldName + '"]');
+                    }
+                    var $checkboxGroup = $('input[type="checkbox"][name="' + fieldName + '"]');
+                    if ($checkboxGroup.length > 1) {
+                        var targetValues = (value || []).map(String);
+                        $checkboxGroup.each(function () {
+                            $(this).prop('checked', targetValues.indexOf(String(this.value)) !== -1);
+                        }).trigger('change');
+                        return;
+                    }
+                    if (!$field.length) {
+                        return;
+                    }
+                    if ($field.is('select')) {
+                        var displayValue = presetDisplay[fieldName];
+                        if ($.isArray(displayValue)) {
+                            displayValue.forEach(function (item) {
+                                if ($field.find('option[value="' + item.id + '"]').length === 0) {
+                                    $field.append(new Option(item.text, item.id, false, false));
+                                }
+                            });
+                        } else if (displayValue && $field.find('option[value="' + displayValue.id + '"]').length === 0) {
+                            $field.append(new Option(displayValue.text, displayValue.id, false, false));
+                        }
+                    }
+                    if ($field.is(':checkbox')) {
+                        $field.prop('checked', !!value).trigger('change').trigger('change.select2');
+                        return;
+                    }
+                    if ($field.is('select[multiple]')) {
+                        $field.val((value || []).map(String)).trigger('change').trigger('change.select2');
+                        return;
+                    }
+                    if ($field.is('select')) {
+                        var nextValue = value == null ? '' : String(value);
+                        $field.val(nextValue).trigger('change').trigger('change.select2');
+                        return;
+                    }
+                    forceTextboxValue($field, value, {triggerEvents: false});
+                }
+
+                async function checkProblemCode(code) {
+                    if (!code) {
+                        return null;
+                    }
+                    try {
+                        var response = await fetch(
+                            '{% url "problem_check_code" %}?code=' + encodeURIComponent(code),
+                            {
+                                method: 'GET',
+                                cache: 'no-cache',
+                                headers: {'X-Requested-With': 'XMLHttpRequest'}
+                            }
+                        );
+                        if (!response.ok) {
+                            return null;
+                        }
+                        var data = await response.json();
+                        return data.exists;
+                    } catch (error) {
+                        return null;
+                    }
+                }
+
+                async function generateIndependentProblemCode() {
+                    var max = 1000000;
+                    for (var i = 0; i < max; i++) {
+                        var code = 'p' + String(i).padStart(6, '0');
+                        var exists = await checkProblemCode(code);
+                        if (exists === false) {
+                            return code;
+                        }
+                    }
+                    return 'clone' + String(Date.now()).slice(-6);
+                }
+
+                function requestAutofillCode() {
+                    var fallbackCode = presetDefaults.code == null ? 'p000000' : String(presetDefaults.code);
+                    overwriteCodeField('');
+                    overwriteCodeField(fallbackCode);
+                    if (typeof window.DKUOJAutofillProblemCode === 'function') {
+                        return window.DKUOJAutofillProblemCode({silent: true}).then(function (generatedCode) {
+                            presetDefaults.code = generatedCode || fallbackCode;
+                            overwriteCodeField(presetDefaults.code);
+                            return presetDefaults.code;
+                        }).catch(function () {
+                            overwriteCodeField(fallbackCode);
+                            presetDefaults.code = fallbackCode;
+                            return fallbackCode;
+                        });
+                    }
+                    return generateIndependentProblemCode().then(function (generatedCode) {
+                        presetDefaults.code = generatedCode || fallbackCode;
+                        overwriteCodeField(presetDefaults.code);
+                        return presetDefaults.code;
+                    }).catch(function () {
+                        overwriteCodeField(fallbackCode);
+                        presetDefaults.code = fallbackCode;
+                        return fallbackCode;
+                    });
+                }
+
+                function rerenderAdvancedSettings() {
+                    watchedFields.forEach(function (fieldName) {
+                        if (fieldName === 'code') {
+                            return;
+                        }
+                        setFieldValue(fieldName, presetDefaults[fieldName]);
+                    });
+                    return requestAutofillCode().then(function (code) {
+                        if (advancedOpen) {
+                            updateAdvancedVisibility();
+                        }
+                        return code;
+                    });
+                }
+
+                function applyPreset(presetName) {
+                    if (presetName !== 'default') {
+                        setPresetValue('custom');
+                        return Promise.resolve();
+                    }
+                    suppressPresetCustom = true;
+                    setPresetValue('default');
+                    return rerenderAdvancedSettings().finally(function () {
+                        suppressPresetCustom = false;
+                        updatePresetFromAdvancedFields();
+                    });
+                }
+
+                function setPresetValue(value) {
+                    if (!$preset.length) {
+                        return;
+                    }
+                    var domPreset = $preset.get(0);
+                    if (domPreset) {
+                        domPreset.value = value;
+                    }
+                    $preset.val(value);
+                    $preset.find('option').prop('selected', false);
+                    $preset.find('option[value="' + value + '"]').prop('selected', true);
+                }
+
+                function markPresetCustom(event) {
+                    if (suppressPresetCustom) {
+                        return;
+                    }
+                    updatePresetFromAdvancedFields();
+                }
+
+                function normalizedValue(fieldName) {
+                    var defaultValue = presetDefaults[fieldName];
+                    if ($.isArray(defaultValue)) {
+                        return defaultValue.map(String).sort().join(',');
+                    }
+                    if (typeof defaultValue === 'boolean') {
+                        return defaultValue ? '1' : '0';
+                    }
+                    return defaultValue == null ? '' : String(defaultValue);
+                }
+
+                function currentValue(fieldName) {
+                    if (fieldName === 'date') {
+                        var dateValue = $('#id_date_0').val() || '';
+                        var timeValue = $('#id_date_1').val() || '';
+                        return (dateValue + ' ' + timeValue).trim();
+                    }
+
+                    var $field = $('#id_' + fieldName);
+                    if (!$field.length) {
+                        $field = $('[name="' + fieldName + '"]');
+                    }
+                    var $checkboxGroup = $('input[type="checkbox"][name="' + fieldName + '"]');
+                    if ($checkboxGroup.length > 1) {
+                        return $checkboxGroup.filter(':checked').map(function () {
+                            return String(this.value);
+                        }).get().sort().join(',');
+                    }
+                    if (!$field.length) {
+                        return '';
+                    }
+                    if ($field.is(':checkbox')) {
+                        return $field.is(':checked') ? '1' : '0';
+                    }
+                    if ($field.is('select[multiple]')) {
+                        return (($field.val() || []).map(String).sort().join(','));
+                    }
+                    return String($field.val() || '');
+                }
+
+                function updatePresetFromAdvancedFields() {
+                    if (suppressPresetCustom) {
+                        return;
+                    }
+                    var isCustomized = watchedFields.some(function (fieldName) {
+                        return currentValue(fieldName) !== normalizedValue(fieldName);
+                    });
+                    setPresetValue(isCustomized ? 'custom' : 'default');
+                }
+
+                function schedulePresetRefresh() {
+                    window.setTimeout(updatePresetFromAdvancedFields, 0);
+                }
+
+                $advancedButton.on('click', function () {
+                    advancedOpen = !advancedOpen;
+                    updateAdvancedVisibility();
+                    if (advancedOpen && $preset.val() === 'default') {
+                        applyPreset('default');
+                    }
+                });
+
+                var presetElement = $preset.get(0);
+                if (presetElement) {
+                    presetElement.addEventListener('change', function () {
+                        if (presetSyncingUi) {
+                            return;
+                        }
+                        applyPreset(this.value);
+                    });
+                }
+
+                function bindAdvancedFieldListeners() {
+                    watchedFields.forEach(function (fieldName) {
+                        var namedFields = document.querySelectorAll('[name="' + fieldName + '"]');
+                        if (!namedFields.length) {
+                            return;
+                        }
+                        namedFields.forEach(function (field) {
+                            field.removeEventListener('change', markPresetCustom);
+                            field.removeEventListener('input', markPresetCustom);
+                            field.addEventListener('change', markPresetCustom);
+                            field.addEventListener('input', markPresetCustom);
+                        });
+                    });
+                    $contentMain.off('.embeddedPreset');
+                    $contentMain.on(
+                        'change.embeddedPreset input.embeddedPreset click.embeddedPreset',
+                        '.embedded-advanced-fields :input, .inline-group :input',
+                        schedulePresetRefresh
+                    );
+                }
+
+                var $presetRow = $('.form-row.field-creation_preset, .field-creation_preset').first();
+                if (!$presetRow.length && $preset.length) {
+                    $presetRow = $preset.closest('.form-row, .fieldBox, .aligned, .form-group');
+                }
+                if ($presetRow.length && $advancedButton.length) {
+                    $('#embedded-advanced-toggle-container').insertAfter($presetRow);
+                }
+
+                if ($preset.val() === 'default') {
+                    applyPreset('default');
+                } else {
+                    setPresetValue($preset.val() || 'custom');
+                }
+                bindAdvancedFieldListeners();
+                updateAdvancedVisibility();
+            {% endif %}
         });
     </script>
 {% endblock extrahead %}
+
+{% block form_top %}
+    {{ block.super }}
+    {% if is_advanced_add %}
+        <input type="hidden" name="_advanced_mode" value="1">
+    {% elif show_embedded_advanced_toggle %}
+        {{ adminform.form.embedded_advanced_mode }}
+        <div id="embedded-advanced-toggle-container" style="margin: 12px 0 16px 120px;">
+            <button class="button" id="embedded-advanced-toggle" type="button">{{ _('Advanced') }}</button>
+        </div>
+    {% endif %}
+{% endblock %}
 
 {% block after_field_sets %}{{ block.super }}
     {% if original %}
