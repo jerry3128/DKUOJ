@@ -34,9 +34,10 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 
 # Build/runtime libs: mysqlclient (libmysqlclient), lxml (libxml2/xslt),
-# git for the git+https requirements, curl for healthchecks.
+# git for the git+https requirements, curl for healthchecks,
+# gettext (msgfmt) for `manage.py compilemessages` in the entrypoint.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential pkg-config git curl \
+        build-essential pkg-config git curl gettext \
         default-libmysqlclient-dev libxml2-dev libxslt1-dev \
     && rm -rf /var/lib/apt/lists/*
 
