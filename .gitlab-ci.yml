@@ -181,7 +181,6 @@ deploy:prod:
     - export WSIMG="$CI_REGISTRY_IMAGE/wsevent:$CI_COMMIT_SHORT_SHA"
     - scp docker-compose.yml prod:"$DATA_DIR/docker-compose.yml"
     - >
-      ssh prod "echo '$CI_REGISTRY_PASSWORD' | docker login '$CI_REGISTRY' -u '$CI_REGISTRY_USER' --password-stdin &&
-      cd '$DATA_DIR' &&
+      ssh prod "cd '$DATA_DIR' &&
       DKUOJ_IMAGE='$IMG' WSEVENT_IMAGE='$WSIMG' docker compose --env-file '$DATA_DIR/.env' pull &&
       DKUOJ_IMAGE='$IMG' WSEVENT_IMAGE='$WSIMG' docker compose --env-file '$DATA_DIR/.env' up -d --remove-orphans"
