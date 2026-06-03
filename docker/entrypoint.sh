@@ -10,8 +10,8 @@ case "$role" in
   web)
     python manage.py migrate --noinput
     python manage.py collectstatic --noinput
-    python manage.py compilemessages --noinput
-    python manage.py compilejsi18n --noinput
+    python manage.py compilemessages
+    python manage.py compilejsi18n
     # COMPRESS_OFFLINE installs may also need: python manage.py compress --force
     exec gunicorn dmoj.wsgi \
         --bind "0.0.0.0:${GUNICORN_PORT:-8000}" \
