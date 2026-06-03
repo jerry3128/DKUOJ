@@ -39,7 +39,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential pkg-config git curl gettext \
         default-libmysqlclient-dev libxml2-dev libxslt1-dev \
-        pandoc texlive-full \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
