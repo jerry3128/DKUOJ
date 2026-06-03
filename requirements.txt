@@ -16,6 +16,9 @@ social-auth-app-django==5.0.0
 pytz
 django-statici18n
 pika
+redis
+websocket-client
+pymysql
 ua-parser
 pyyaml
 jinja2
