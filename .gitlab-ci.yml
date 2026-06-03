@@ -148,8 +148,10 @@ build-wsevent:
   variables:
     GIT_SUBMODULE_STRATEGY: none
     DATA_DIR: /srv/dkuoj                      # holds .env, local_settings.py, static/
-  before_script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+  # No per-job `docker login` here: the deploy runner runs as the `deploy` user on
+  # the dev host, which holds a persisted registry credential from a one-time login
+  # with a read_registry deploy token. So `docker compose pull` authenticates without
+  # rewriting ~/.docker/config.json every run (that write is what previously failed).
 
 deploy:dev:
   extends: .deploy
