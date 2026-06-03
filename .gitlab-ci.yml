@@ -64,7 +64,11 @@ test:
   variables:
     MYSQL_DATABASE: dmoj
     MYSQL_ROOT_PASSWORD: root
-    DB_HOST: mysql                           # consumed by .ci.settings.py
+    # OIT shared runners are Kubernetes-backed: the service shares the build
+    # pod's network namespace, so it's reached at 127.0.0.1 (not the `mysql`
+    # alias). Use the literal IP — libmysqlclient treats `localhost` as a Unix
+    # socket, which doesn't exist here.
+    DB_HOST: "127.0.0.1"                      # consumed by .ci.settings.py
   cache:
     key:
       files:
@@ -76,6 +80,8 @@ test:
     - pip install wheel
     - pip install -r requirements.txt
     - pip install mysqlclient coverage
+    # Wait for the MySQL service to accept TCP before the test DB is created.
+    - for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/3306) 2>/dev/null && break; sleep 1; done
     - cp .ci.settings.py dmoj/local_settings.py
   script:
     - coverage run --source=. manage.py test judge
