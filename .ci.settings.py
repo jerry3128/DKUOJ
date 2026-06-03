@@ -14,7 +14,9 @@ DATABASES = {
         'NAME': 'dmoj',
         'USER': 'root',
         'PASSWORD': 'root',
-        'HOST': 'localhost',
+        # Default to localhost (GitHub Actions MySQL); CI can point this at a
+        # service alias (e.g. 'mysql' on GitLab CI) via the DB_HOST env var.
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
         'PORT': '3306',
         'OPTIONS': {
             'charset': 'utf8mb4',

@@ -1,0 +1,171 @@
+# DKUOJ (site) CI/CD — GitLab CI port + modernization.
+# Replaces the former GitHub Actions in .github/workflows/.
+#
+# Pipeline:  lint -> test -> build (image) -> deploy
+#   * lint/styles/test run on OIT shared Docker runners.
+#   * build-image pushes the site image to the GitLab Container Registry.
+#   * deploy:* run on the dedicated, project-locked runner on the DEV server
+#     (tag: dku-deploy). deploy:dev acts locally; deploy:prod SSHes to prod.
+
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive          # pulls resources/libs (site-assets)
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  DKUOJ_IMAGE: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+
+default:
+  interruptible: true                        # auto-cancel superseded pipelines
+
+# Run for MRs and for branch/tag pushes, but never double up a branch pipeline
+# when an MR is already open for that branch.
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+
+# ---------------------------------------------------------------------------
+# lint
+# ---------------------------------------------------------------------------
+lint:
+  stage: lint
+  image: python:3.11
+  script:
+    - pip install flake8 flake8-import-order flake8-future-import flake8-commas flake8-logging-format flake8-quotes
+    - flake8 --version
+    - flake8
+
+styles:
+  stage: lint
+  image: node:20
+  script:
+    - npm install -g sass postcss-cli postcss autoprefixer
+    - ./make_style.sh
+
+# ---------------------------------------------------------------------------
+# test (matrix py3.11 / py3.12, MySQL service, GitLab-native coverage)
+# ---------------------------------------------------------------------------
+test:
+  stage: test
+  image: $PY_IMAGE
+  parallel:
+    matrix:
+      - PY_IMAGE: ["python:3.11", "python:3.12"]
+  services:
+    - name: mysql:8
+      alias: mysql
+  variables:
+    MYSQL_DATABASE: dmoj
+    MYSQL_ROOT_PASSWORD: root
+    DB_HOST: mysql                           # consumed by .ci.settings.py
+  cache:
+    key:
+      files:
+        - requirements.txt
+    paths:
+      - .cache/pip
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends default-libmysqlclient-dev pkg-config
+    - pip install wheel
+    - pip install -r requirements.txt
+    - pip install mysqlclient coverage
+    - cp .ci.settings.py dmoj/local_settings.py
+  script:
+    - coverage run --source=. manage.py test judge
+    - coverage xml
+    - coverage report
+  coverage: '/^TOTAL.+?(\d+\%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    expire_in: 1 week
+
+# ---------------------------------------------------------------------------
+# build image (Kaniko — no privileged runner required)
+# Builds two targets from one Dockerfile: the Python app and the Node wsevent.
+# ---------------------------------------------------------------------------
+.build-image:
+  stage: build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
+  before_script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"auth\":\"$(printf '%s:%s' "$CI_REGISTRY_USER" "$CI_REGISTRY_PASSWORD" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+
+build-web:
+  extends: .build-image
+  script:
+    - /kaniko/executor
+      --context "$CI_PROJECT_DIR"
+      --dockerfile "$CI_PROJECT_DIR/Dockerfile"
+      --target web
+      --destination "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+      --destination "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
+
+build-wsevent:
+  extends: .build-image
+  script:
+    - /kaniko/executor
+      --context "$CI_PROJECT_DIR"
+      --dockerfile "$CI_PROJECT_DIR/Dockerfile"
+      --target wsevent
+      --destination "$CI_REGISTRY_IMAGE/wsevent:$CI_COMMIT_SHORT_SHA"
+      --destination "$CI_REGISTRY_IMAGE/wsevent:$CI_COMMIT_REF_SLUG"
+
+# ---------------------------------------------------------------------------
+# deploy (run on the dev-server shell runner; tag: dku-deploy)
+# ---------------------------------------------------------------------------
+.deploy:
+  stage: deploy
+  tags:
+    - dku-deploy
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+    DATA_DIR: /srv/dkuoj                      # holds .env, local_settings.py, static/
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+
+deploy:dev:
+  extends: .deploy
+  environment:
+    name: dev
+    url: http://10.200.14.8
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+  script:
+    # Runs locally on the dev host where this runner lives.
+    - export DKUOJ_IMAGE="$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - export WSEVENT_IMAGE="$CI_REGISTRY_IMAGE/wsevent:$CI_COMMIT_SHORT_SHA"
+    - docker compose --env-file "$DATA_DIR/.env" -f docker-compose.yml pull
+    - docker compose --env-file "$DATA_DIR/.env" -f docker-compose.yml up -d --remove-orphans
+
+deploy:prod:
+  extends: .deploy
+  environment:
+    name: production
+    url: https://oj.dukekunshan.edu.cn
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual                             # protected environment + manual gate
+  script:
+    # Runs on the dev runner, deploys to prod over SSH (key lives on the dev host).
+    - export IMG="$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - export WSIMG="$CI_REGISTRY_IMAGE/wsevent:$CI_COMMIT_SHORT_SHA"
+    - scp docker-compose.yml prod:"$DATA_DIR/docker-compose.yml"
+    - >
+      ssh prod "echo '$CI_REGISTRY_PASSWORD' | docker login '$CI_REGISTRY' -u '$CI_REGISTRY_USER' --password-stdin &&
+      cd '$DATA_DIR' &&
+      DKUOJ_IMAGE='$IMG' WSEVENT_IMAGE='$WSIMG' docker compose --env-file '$DATA_DIR/.env' pull &&
+      DKUOJ_IMAGE='$IMG' WSEVENT_IMAGE='$WSIMG' docker compose --env-file '$DATA_DIR/.env' up -d --remove-orphans"

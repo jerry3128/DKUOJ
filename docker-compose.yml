@@ -1,0 +1,61 @@
+# DKUOJ site stack (site app only — MySQL, Redis and the judge stay on the host).
+#
+# Required env (provided by the deploy job / --env-file $DATA_DIR/.env):
+#   DKUOJ_IMAGE     full ref of the web image     (registry/dku-oj/dkuoj:<sha>)
+#   WSEVENT_IMAGE   full ref of the wsevent image (registry/dku-oj/dkuoj/wsevent:<sha>)
+#   DATA_DIR        host dir with .env, local_settings.py and static/ (default /srv/dkuoj)
+#
+# Per-deploy app config lives in $DATA_DIR/local_settings.py (mounted read-only).
+# Containers reach host services (MySQL/Redis) via host.docker.internal — point
+# DATABASES/CACHES/CELERY_BROKER_URL there in local_settings.py. See docs/deploy.md.
+
+# Log to stdout/stderr (the app's console handler) and let Docker rotate them.
+# View with `docker compose logs -f <service>`. Tune/replace the driver here to
+# ship to journald or an aggregator later without touching the app.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "10"
+
+x-app: &app
+  image: ${DKUOJ_IMAGE}
+  restart: unless-stopped
+  logging: *logging
+  env_file:
+    - ${DATA_DIR:-/srv/dkuoj}/.env
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  volumes:
+    - ${DATA_DIR:-/srv/dkuoj}/local_settings.py:/app/dmoj/local_settings.py:ro
+    - ${DATA_DIR:-/srv/dkuoj}/static:/app/static
+    - ${DATA_DIR:-/srv/dkuoj}/media:/app/media
+    # Problem test data (DMOJ_PROBLEM_DATA_ROOT) — same path inside & out so the
+    # test-data management features work. Keep in sync with the judge's copy.
+    - ${PROBLEM_DATA_ROOT:-/mnt/problems}:/mnt/problems
+
+services:
+  web:
+    <<: *app
+    command: ["web"]
+    ports:
+      - "127.0.0.1:8000:8000"        # host nginx reverse-proxies to this
+
+  celery:
+    <<: *app
+    command: ["celery"]
+
+  bridge:
+    <<: *app
+    command: ["bridge"]
+    ports:
+      - "9999:9999"                  # host/remote judges connect here (BRIDGED_JUDGE_ADDRESS)
+
+  wsevent:
+    image: ${WSEVENT_IMAGE}
+    restart: unless-stopped
+    logging: *logging
+    ports:
+      - "127.0.0.1:15100:15100"      # client websocket  (EVENT_DAEMON_GET, via nginx)
+      - "127.0.0.1:15102:15102"      # client long-poll   (EVENT_DAEMON_POLL, via nginx)
+    # 15101 (post) stays internal: the app posts to it as ws://wsevent:15101/

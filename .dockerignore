@@ -1,0 +1,23 @@
+.git
+.github
+.gitlab-ci.yml
+node_modules
+**/__pycache__
+*.py[co]
+.idea
+.vscode
+.sass-cache
+sass_processed
+# Generated style assets are rebuilt in the styles stage.
+resources/style.css
+resources/ace-dmoj.css
+resources/featherlight.css
+resources/martor-description.css
+resources/select2-dmoj.css
+resources/dark
+resources/vars.scss
+dmoj/local_settings.py
+bridge_logs
+*.sqlite3
+docs
+README.md
