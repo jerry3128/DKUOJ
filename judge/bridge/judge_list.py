@@ -108,6 +108,13 @@ class JudgeList(object):
         with self.lock:
             self._handle_free_judge(judge)
 
+    def request_update_problems(self):
+        # Tell every connected judge to rescan its problem directory. Each judge re-sends
+        # its supported-problems list, so only judges that actually have the data report it.
+        with self.lock:
+            for judge in self.judges:
+                judge.request_update_problems()
+
     def update_disable_judge(self, judge_id, is_disabled):
         with self.lock:
             for judge in self.judges:

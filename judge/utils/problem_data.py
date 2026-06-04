@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 
@@ -8,6 +9,8 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage
 from django.urls import reverse
 from django.utils.translation import gettext as _
+
+logger = logging.getLogger('judge.problem.data')
 
 if os.altsep:
     def split_path_first(path, repath=re.compile('[%s]' % re.escape(os.sep + os.altsep))):
@@ -254,3 +257,11 @@ class ProblemDataCompiler(object):
     def generate(cls, *args, **kwargs):
         self = cls(*args, **kwargs)
         self.compile()
+        # The init.yml was just (re)written/deleted; tell judges to rescan so the change
+        # is picked up without a judge restart. Best-effort: a bridge outage must not break
+        # saving problem data.
+        try:
+            from judge.judgeapi import update_problems
+            update_problems()
+        except Exception:
+            logger.exception('Failed to notify judges of problem data update for %s', self.problem.code)

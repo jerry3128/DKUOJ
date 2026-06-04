@@ -226,6 +226,15 @@ class JudgeHandler(ZlibPacketHandler):
         else:
             self.send({'name': 'disconnect'})
 
+    def request_update_problems(self):
+        # Ask the judge to rescan its problem directory and re-send its supported-problems
+        # list. Used when problem data changes on disk but the judge's filesystem monitor
+        # can't observe it (e.g. inotify not delivered across a Docker bind mount).
+        try:
+            self.send({'name': 'update-problems'})
+        except Exception:
+            logger.exception('Failed to request problem update from judge: %s', self.name)
+
     def submit(self, id, problem, language, source, ide_custom_input=None):
         data = self.get_related_submission_data(id)
         self._working = id
