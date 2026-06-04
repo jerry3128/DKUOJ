@@ -23,3 +23,10 @@ DATABASES = {
         },
     },
 }
+
+# Emit JUnit XML so GitLab can render per-test results (artifacts:reports:junit).
+# This file is copied to dmoj/local_settings.py only in CI, so the runner override
+# is automatically scoped to CI and never affects local/dev test runs.
+TEST_RUNNER = 'xmlrunner.extra.djangotestrunner.XMLTestRunner'
+TEST_OUTPUT_DIR = 'test-reports'
+TEST_OUTPUT_VERBOSE = 2
