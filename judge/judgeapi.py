@@ -120,6 +120,14 @@ def update_disable_judge(judge):
     judge_request({'name': 'disable-judge', 'judge-id': judge.name, 'is-disabled': judge.is_disabled})
 
 
+def update_problems():
+    # Notify connected judges that problem data changed on disk so they rescan and
+    # re-report their supported problems. Judges can't rely on a filesystem monitor when
+    # the data is written from another host/container (e.g. inotify is not delivered
+    # across a Docker bind mount), so the site pushes the update through the bridge.
+    judge_request({'name': 'update-problems'}, reply=False)
+
+
 def abort_submission(submission):
     from .models import Submission
     # We only want to try to abort a submission if it's still grading, otherwise this can lead to fully graded

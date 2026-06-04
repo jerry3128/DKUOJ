@@ -19,6 +19,7 @@ class DjangoHandler(ZlibPacketHandler):
             'terminate-submission': self.on_termination,
             'disconnect-judge': self.on_disconnect_request,
             'disable-judge': self.on_disable_judge,
+            'update-problems': self.on_update_problems,
         }
         self.judges = judges
 
@@ -60,6 +61,9 @@ class DjangoHandler(ZlibPacketHandler):
         judge_id = data['judge-id']
         is_disabled = data['is-disabled']
         self.judges.update_disable_judge(judge_id, is_disabled)
+
+    def on_update_problems(self, data):
+        self.judges.request_update_problems()
 
     def on_malformed(self, packet):
         logger.error('Malformed packet: %s', packet)
