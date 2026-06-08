@@ -467,6 +467,9 @@ class ContestJoin(LoginRequiredMixin, ContestMixin, SingleObjectMixin, View):
                     real_start=timezone.now(),
                 )
             else:
+                if requires_access_code:
+                    raise ContestAccessDenied()
+
                 if participation.ended:
                     participation = ContestParticipation.objects.get_or_create(
                         contest=contest, user=profile, virtual=SPECTATE,
@@ -977,7 +980,7 @@ class ContestExportPDF(ContestMixin, View):
                     }});
                 </script>
                 <meta charset="UTF-8">
-                <title>Contest Paper - {contest.name}</title>
+                <title>{contest.name}</title>
                 <style>
                     @media print {{
                         @page {{
@@ -1342,7 +1345,6 @@ class ContestExportPDF(ContestMixin, View):
             <body>
                 <!-- 封面页 -->
                 <div class="page cover-page">
-                    <div class="contest-title">{contest.name}</div>
                     <div class="contest-info">
                         <div>
                             <span class="bold">Start Time: </span>
@@ -1351,10 +1353,6 @@ class ContestExportPDF(ContestMixin, View):
                         <div>
                             <span class="bold">End Time: </span>
                             {contest.end_time}
-                        </div>
-                        <div>
-                            <span class="bold">Time Limits: </span>
-                            {contest.time_limit or 'No limit'}
                         </div>
                         <div>
                             <span class="bold">Total Problems: </span>
@@ -1370,7 +1368,6 @@ class ContestExportPDF(ContestMixin, View):
                         </div>
                     </div>
                     <div class="instructions">
-                        <h3>Instructions</h3>
                         <ul>
                             <li>Total Score: {totalscore}</li>
                             <li>Pages: {contest_problems.count() + 1}</li>
@@ -1407,9 +1404,6 @@ class ContestExportPDF(ContestMixin, View):
                 <div class="page {'last-page' if page_num == contest_problems.count() else ''}">
                     <!-- 页眉 -->
                     <div class="page-header">
-                        <div class="contest-name">
-                            {contest.name}
-                        </div>
                         <div class="problem-info">
                             Problem {page_num} / {contest_problems.count()} <br>
                             <span class="problem-points">{points} - points</span>
@@ -1437,9 +1431,6 @@ class ContestExportPDF(ContestMixin, View):
                 <div class="page {'last-page' if page_num == contest_problems.count() else ''}">
                     <!-- 页眉 -->
                     <div class="page-header">
-                        <div class="contest-name">
-                            {contest.name}
-                        </div>
                         <div class="problem-info">
                             Problem {page_num} / {contest_problems.count()} <br>
                             <span class="problem-points">{points} - points</span>
@@ -1513,7 +1504,7 @@ class ContestExportPDF(ContestMixin, View):
                     format='html',
                     outputfile=pdf_path,
                     extra_args=[
-                        '--pdf-engine=pdflatex',
+                        '--pdf-engine=lualatex',
                         '--mathjax',
 
                         '-V', 'geometry:margin=1in',
@@ -1594,7 +1585,7 @@ class ContestExportWord(ContestMixin, View):
                     }});
                 </script>
                 <meta charset="UTF-8">
-                <title>Contest Paper - {contest.name}</title>
+                <title>{contest.name}</title>
                 <style>
                     @media print {{
                         @page {{
@@ -1959,7 +1950,6 @@ class ContestExportWord(ContestMixin, View):
             <body>
                 <!-- 封面页 -->
                 <div class="page cover-page">
-                    <div class="contest-title">{contest.name}</div>
                     <div class="contest-info">
                         <div>
                             <span class="bold">Start Time: </span>
@@ -1968,10 +1958,6 @@ class ContestExportWord(ContestMixin, View):
                         <div>
                             <span class="bold">End Time: </span>
                             {contest.end_time}
-                        </div>
-                        <div>
-                            <span class="bold">Time Limits: </span>
-                            {contest.time_limit or 'No limit'}
                         </div>
                         <div>
                             <span class="bold">Total Problems: </span>
@@ -1987,7 +1973,6 @@ class ContestExportWord(ContestMixin, View):
                         </div>
                     </div>
                     <div class="instructions">
-                        <h3>Instructions</h3>
                         <ul>
                             <li>Total Score: {totalscore}</li>
                             <li>Pages: {contest_problems.count() + 1}</li>
@@ -2024,9 +2009,6 @@ class ContestExportWord(ContestMixin, View):
                 <div class="page {'last-page' if page_num == contest_problems.count() else ''}">
                     <!-- 页眉 -->
                     <div class="page-header">
-                        <div class="contest-name">
-                            {contest.name}
-                        </div>
                         <div class="problem-info">
                             Problem {page_num} / {contest_problems.count()} <br>
                             <span class="problem-points">{points} - points</span>
@@ -2054,9 +2036,6 @@ class ContestExportWord(ContestMixin, View):
                 <div class="page {'last-page' if page_num == contest_problems.count() else ''}">
                     <!-- 页眉 -->
                     <div class="page-header">
-                        <div class="contest-name">
-                            {contest.name}
-                        </div>
                         <div class="problem-info">
                             Problem {page_num} / {contest_problems.count()} <br>
                             <span class="problem-points">{points} - points</span>

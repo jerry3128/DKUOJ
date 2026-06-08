@@ -1,7 +1,8 @@
 # DKU OJ
 
-![](https://img.shields.io/github/actions/workflow/status/binghan1227/DKUOJ/build.yml?branch=customize)
-![](https://img.shields.io/github/license/binghan1227/DKUOJ)
+[![pipeline status](https://gitlab.oit.duke.edu/dku-oj/dkuoj/badges/main/pipeline.svg)](https://gitlab.oit.duke.edu/dku-oj/dkuoj/-/commits/main)
+[![coverage report](https://gitlab.oit.duke.edu/dku-oj/dkuoj/badges/main/coverage.svg)](https://gitlab.oit.duke.edu/dku-oj/dkuoj/-/commits/main)
+![license](https://img.shields.io/badge/license-AGPL--3.0-blue)
 
 This is a customized fork of the [DMOJ: Modern Online Judge](https://dmoj.ca/), tailored with specific features for course management and enhanced user experience.
 
