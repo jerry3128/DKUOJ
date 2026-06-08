@@ -551,6 +551,7 @@ class ProblemAdmin(NoBatchDeleteMixin, VersionAdmin):
 
         super(ProblemAdmin, self).save_model(request, obj, form, change)
         if (
+            change and
             form.changed_data and
             any(f in form.changed_data for f in ('is_public', 'organizations', 'classes', 'points', 'partial'))
         ):

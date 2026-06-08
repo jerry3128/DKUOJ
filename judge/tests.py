@@ -2,7 +2,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from judge.models import Contest, Language, Problem
+from judge.models import Contest, ContestProblem, Language, Problem
 from judge.models.tests.util import CommonDataMixin, create_problem_group, create_problem_type
 
 
@@ -105,6 +105,8 @@ class ContestAdminCreationTestCase(CommonDataMixin, TestCase):
         self.assertContains(response, 'name="name"', html=False)
         self.assertContains(response, 'name="start_time_0"', html=False)
         self.assertContains(response, 'name="end_time_0"', html=False)
+        self.assertContains(response, 'contestproblem_set-TOTAL_FORMS', html=False)
+        self.assertContains(response, 'contestproblem_set-0-problem', html=False)
         self.assertContains(response, 'name="creation_preset"', html=False)
         self.assertContains(response, 'id="embedded-advanced-toggle"', html=False)
         self.assertContains(response, 'name="embedded_advanced_mode"', html=False)
@@ -118,9 +120,39 @@ class ContestAdminCreationTestCase(CommonDataMixin, TestCase):
         self.assertNotContains(response, 'name="creation_preset"', html=False)
 
     def test_admin_add_page_can_create_contest_with_automatic_defaults(self):
+        problem_one = Problem.objects.create(
+            code='contestproblemone',
+            name='Contest Problem One',
+            description='',
+            group=create_problem_group('contest-group-1'),
+            time_limit=1,
+            memory_limit=65536,
+            points=1,
+        )
+        problem_two = Problem.objects.create(
+            code='contestproblemtwo',
+            name='Contest Problem Two',
+            description='',
+            group=create_problem_group('contest-group-2'),
+            time_limit=1,
+            memory_limit=65536,
+            points=1,
+        )
         data = self.contest_post_data()
         data.update({
             'creation_preset': 'default',
+            'contestproblem_set-TOTAL_FORMS': '2',
+            'contestproblem_set-INITIAL_FORMS': '0',
+            'contestproblem_set-MIN_NUM_FORMS': '0',
+            'contestproblem_set-MAX_NUM_FORMS': '1000',
+            'contestproblem_set-0-problem': problem_one.pk,
+            'contestproblem_set-0-points': '100',
+            'contestproblem_set-0-partial': 'on',
+            'contestproblem_set-0-order': '1',
+            'contestproblem_set-1-problem': problem_two.pk,
+            'contestproblem_set-1-points': '100',
+            'contestproblem_set-1-partial': 'on',
+            'contestproblem_set-1-order': '2',
             '_save': 'Save',
         })
 
@@ -138,6 +170,10 @@ class ContestAdminCreationTestCase(CommonDataMixin, TestCase):
         self.assertEqual(contest.points_precision, 3)
         self.assertEqual(contest.format_name, 'default')
         self.assertEqual(contest.access_code, '')
+        self.assertCountEqual(
+            ContestProblem.objects.filter(contest=contest).values_list('problem__code', flat=True),
+            ['contestproblemone', 'contestproblemtwo'],
+        )
 
     def test_admin_embedded_advanced_mode_can_use_manual_settings(self):
         data = self.contest_post_data(name='Manual Contest')

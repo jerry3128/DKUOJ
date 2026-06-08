@@ -5,7 +5,7 @@
     {% if show_embedded_advanced_toggle %}
         <style>
             #content-main .embedded-advanced-fields,
-            #content-main .inline-group {
+            #content-main .inline-group:not(.basic-inline-group) {
                 max-height: 0;
                 overflow: hidden;
                 opacity: 0;
@@ -18,7 +18,7 @@
             }
 
             #content-main.advanced-expanded .embedded-advanced-fields,
-            #content-main.advanced-expanded .inline-group {
+            #content-main.advanced-expanded .inline-group:not(.basic-inline-group) {
                 max-height: 2000px;
                 opacity: 1;
                 overflow: hidden;
@@ -382,8 +382,17 @@
                 if (!$presetRow.length && $preset.length) {
                     $presetRow = $preset.closest('.form-row, .fieldBox, .aligned, .form-group');
                 }
+                var $basicInlineGroup = $('.inline-group.basic-inline-group').first();
+                if (!$basicInlineGroup.length) {
+                    $basicInlineGroup = $('.inline-group').first();
+                    $basicInlineGroup.addClass('basic-inline-group');
+                }
+                if ($presetRow.length && $basicInlineGroup.length) {
+                    $basicInlineGroup.insertAfter($presetRow);
+                }
                 if ($presetRow.length && $advancedButton.length) {
-                    $('#embedded-advanced-toggle-container').insertAfter($presetRow);
+                    var $advancedAnchor = $basicInlineGroup.length ? $basicInlineGroup : $presetRow;
+                    $('#embedded-advanced-toggle-container').insertAfter($advancedAnchor);
                 }
 
                 if ($preset.val() === 'default') {
